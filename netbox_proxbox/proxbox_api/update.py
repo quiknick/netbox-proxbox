@@ -18,14 +18,13 @@ from . import (
 )
 
 
-
 # Call all functions to update Virtual Machine
 def vm_full_update(netbox_vm, proxmox_vm):
     changes = {}
 
     # Update 'status' field, if necessary.
     status_updated = updates.virtual_machine.status(netbox_vm, proxmox_vm)
-                
+
     # Update 'custom_fields' field, if necessary.
     custom_fields_updated = updates.virtual_machine.custom_fields(netbox_vm, proxmox_vm)
 
@@ -36,18 +35,19 @@ def vm_full_update(netbox_vm, proxmox_vm):
     resources_updated = updates.virtual_machine.resources(netbox_vm, proxmox_vm)
 
     tag_updated = updates.extras.tag(netbox_vm)
-
-    #changes = [custom_fields_updated, status_updated, local_context_updated, resources_updated]
+    #
+    ip_update = updates.virtual_machine.add_ip(netbox_vm, proxmox_vm)
+    # changes = [custom_fields_updated, status_updated, local_context_updated, resources_updated]
     changes = {
-        "status" : status_updated,
-        "custom_fields" : custom_fields_updated,
-        "local_context" : local_context_updated,
-        "resources" : resources_updated,
-        "tag" : tag_updated
+        "status": status_updated,
+        "custom_fields": custom_fields_updated,
+        "local_context": local_context_updated,
+        "resources": resources_updated,
+        "tag": tag_updated,
+        "ip": ip_update
     }
 
     return changes
-
 
 
 def node_full_update(netbox_node, proxmox_json, proxmox_cluster):
@@ -57,12 +57,11 @@ def node_full_update(netbox_node, proxmox_json, proxmox_cluster):
     cluster_updated = updates.node.cluster(netbox_node, proxmox_json, proxmox_cluster)
 
     changes = {
-        "status" : status_updated,
-        "cluster" : cluster_updated
+        "status": status_updated,
+        "cluster": cluster_updated
     }
 
     return changes
-
 
 
 # Verify if VM/CT exist on Netbox
@@ -79,20 +78,18 @@ def is_vm_on_netbox(netbox_vm):
     return vm_on_netbox
 
 
-
 def search_by_proxmox_id(proxmox_id):
     all_proxmox_vms = proxmox.cluster.resources.get(type='vm')
 
     for px_vm in all_proxmox_vms:
         px_id = px_vm.get("vmid")
-        
+
         if px_id == proxmox_id:
             proxmox_vm = px_vm
             return proxmox_vm
-    
+
     # If JSON not found, return None.
     return None
-
 
 
 def search_by_proxmox_name(proxmox_name):
@@ -109,7 +106,6 @@ def search_by_proxmox_name(proxmox_name):
     return None
 
 
-
 def search_by_id(id):
     # Save Netbox VirtualMachine object
     netbox_obj = nb.virtualization.virtual_machines.get(id)
@@ -123,13 +119,12 @@ def search_by_id(id):
 
         if proxmox_json != None:
             proxmox_id = proxmox_json.get("id")
-            
+
             if proxmox_id != None:
                 return proxmox_id
 
     # Return Proxmox Name in case ID not found.
     return proxmox_name
-
 
 
 # Makes all necessary checks so that VM/CT exist on Netbox.
@@ -153,7 +148,7 @@ def virtual_machine(**kwargs):
         proxmox_id_type = type(proxmox_id)
         if 'int' not in str(proxmox_id_type):
             print('[ERROR] "proxmox_id" MUST be integer. Type used: {}'.format(proxmox_id_type))
-            #return False
+            # return False
             json_vm["result"] = False
 
     # Save arg
@@ -164,10 +159,9 @@ def virtual_machine(**kwargs):
         id_type = type(id)
         if 'int' not in str(id_type):
             print('[ERROR] "id" MUST be integer. Type used: {}'.format(id_type))
-            #return False
+            # return False
             json_vm["result"] = False
-            
-    
+
     # Save arg
     name = kwargs.get('name')
 
@@ -176,7 +170,7 @@ def virtual_machine(**kwargs):
         name_type = type(name)
         if 'str' not in str(name_type):
             print('[ERROR] "name" MUST be string. Type used: {}'.format(name_type))
-            #return False
+            # return False
             json_vm["result"] = False
 
     # Save arg
@@ -190,7 +184,7 @@ def virtual_machine(**kwargs):
         json_vm["name"] = proxmox_json['name']
 
     # If 'proxmox_json' was not passed as argument, use other args
-    else:    
+    else:
         #
         # With arguments passed on the function, search for JSON of VM on Proxmox
         # Searching priorirty:
@@ -215,7 +209,7 @@ def virtual_machine(**kwargs):
                 # Analyze search result and returns error, if null value.
                 if proxmox_json == None:
                     print("[ERROR] Error to get Proxmox Virtual Machine using 'proxmox_id'")
-                    json_vm["result"] = False            
+                    json_vm["result"] = False
 
                 proxmox_vm_name = proxmox_json['name']
                 json_vm["name"] = proxmox_json['name']
@@ -228,7 +222,7 @@ def virtual_machine(**kwargs):
                 if proxmox_json == None:
                     print("[ERROR] Error to get Proxmox Virtual Machine using 'proxmox_name'")
                     json_vm["result"] = False
-                
+
                 proxmox_vm_name = proxmox_json['name']
                 json_vm["name"] = proxmox_json['name']
 
@@ -240,7 +234,7 @@ def virtual_machine(**kwargs):
                 # Analyze search result and returns error, if null value.
                 if proxmox_json == None:
                     print("[ERROR] Error to get Proxmox Virtual Machine using 'proxmox_id'")
-                    json_vm["result"] = False      
+                    json_vm["result"] = False
 
                 proxmox_vm_name = proxmox_json['name']
                 json_vm["name"] = proxmox_json['name']
@@ -254,7 +248,7 @@ def virtual_machine(**kwargs):
                     if proxmox_json == None:
                         print("[ERROR] Error to get Proxmox Virtual Machine using 'proxmox_name'")
                         json_vm["result"] = False
-                    
+
                     proxmox_vm_name = proxmox_json['name']
                     json_vm["name"] = proxmox_json['name']
 
@@ -262,7 +256,7 @@ def virtual_machine(**kwargs):
         return False
 
     # Search Netbox object by name gotten from Proxmox
-    netbox_vm = nb.virtualization.virtual_machines.get(name = proxmox_vm_name)
+    netbox_vm = nb.virtualization.virtual_machines.get(name=proxmox_vm_name)
 
     # Analyze if VM exist on Netbox
     # If VM/CT already exist on Proxmox, check VM and update it, if necessary.
@@ -270,7 +264,7 @@ def virtual_machine(**kwargs):
 
     if vm_on_netbox == True:
         # Update Netbox information
-        full_update = vm_full_update(netbox_vm, proxmox_json)  
+        full_update = vm_full_update(netbox_vm, proxmox_json)
         json_vm["changes"] = full_update
 
         full_update_list = list(full_update.values())
@@ -288,14 +282,13 @@ def virtual_machine(**kwargs):
     elif vm_on_netbox == False:
         print('[OK] VM does not exist on Netbox -> {}'.format(proxmox_vm_name))
 
-
         # Analyze if VM was sucessfully created.
         netbox_vm = create.virtualization.virtual_machine(proxmox_json)
 
         # VM created with basic information
         if netbox_vm != None:
             # Update rest of configuration
-            full_update = vm_full_update(netbox_vm, proxmox_json)  
+            full_update = vm_full_update(netbox_vm, proxmox_json)
             json_vm["changes"] = full_update
 
             full_update_list = list(full_update.values())
@@ -304,16 +297,15 @@ def virtual_machine(**kwargs):
             if True in full_update_list:
                 print('[OK] VM created -> {}'.format(proxmox_vm_name))
 
-
                 # VM fully updated
                 json_vm["result"] = True
 
             else:
-                print('[OK] VM created, but full update failed -> {}'.format(proxmox_vm_name))               
+                print('[OK] VM created, but full update failed -> {}'.format(proxmox_vm_name))
 
                 # VM created with basic information
                 json_vm["result"] = True
-        
+
         else:
             print('[ERROR] VM not created. -> {}'.format(proxmox_vm_name))
 
@@ -322,12 +314,15 @@ def virtual_machine(**kwargs):
 
     else:
         print("[ERROR] Unexpected error -> {}".format(proxmox_vm_name))
-        
+
         # Unexpected error
         json_vm["result"] = False
 
     return json_vm
 
+
+def interface(**kwargs):
+    pass
 
 
 def nodes(**kwargs):
@@ -339,10 +334,10 @@ def nodes(**kwargs):
     json_node = {}
 
     # Search netbox using VM name
-    netbox_search = nb.dcim.devices.get(name = proxmox_node_name)
+    netbox_search = nb.dcim.devices.get(name=proxmox_node_name)
 
     # Search node on Netbox with Proxmox node name gotten
-    if nb.dcim.devices.get(name = proxmox_node_name) == None:
+    if nb.dcim.devices.get(name=proxmox_node_name) == None:
         # If node does not exist, create it.
         netbox_node = create.dcim.node(proxmox_json)
 
@@ -351,7 +346,7 @@ def nodes(**kwargs):
             print("[OK] Node created! -> {}".format(proxmox_node_name))
 
             # Update rest of configuration
-            full_update = node_full_update(netbox_node, proxmox_json, proxmox_cluster)  
+            full_update = node_full_update(netbox_node, proxmox_json, proxmox_cluster)
             json_node["changes"] = full_update
 
             full_update_list = list(full_update.values())
@@ -375,7 +370,7 @@ def nodes(**kwargs):
         netbox_node = netbox_search
 
         # Update Netbox node information, if necessary.
-        full_update = node_full_update(netbox_node, proxmox_json, proxmox_cluster)  
+        full_update = node_full_update(netbox_node, proxmox_json, proxmox_cluster)
         json_node["changes"] = full_update
 
         full_update_list = list(full_update.values())
@@ -388,11 +383,8 @@ def nodes(**kwargs):
 
         # return True as the node was successfully created.
         json_node["result"] = True
-        
 
-        
     return json_node
-
 
 
 # Makes everything needed so that VIRTUAL MACHINES / CONTAINERS, NODES and CLUSTER exists on Netbox
@@ -417,10 +409,9 @@ def all(**kwargs):
 
     # Get all NODES from Proxmox
     for px_node_each in proxmox_nodes:
-        node_updated = nodes(proxmox_json = px_node_each, proxmox_cluster = proxmox_cluster)
+        node_updated = nodes(proxmox_json=px_node_each, proxmox_cluster=proxmox_cluster)
 
         nodes_list.append(node_updated)
-
 
     #
     # VIRTUAL MACHINES / CONTAINERS
@@ -430,8 +421,8 @@ def all(**kwargs):
 
     print('\nUPDATE ALL...')
     # Get all VM/CTs from Proxmox
-    for px_vm_each in proxmox.cluster.resources.get(type='vm'):     
-        vm_updated = virtual_machine(proxmox_json = px_vm_each)
+    for px_vm_each in proxmox.cluster.resources.get(type='vm'):
+        vm_updated = virtual_machine(proxmox_json=px_vm_each)
 
         virtualmachines_list.append(vm_updated)
 
@@ -442,7 +433,7 @@ def all(**kwargs):
     if remove_unused == True:
         print('\nREMOVE UNUSED DATA...')
         remove_info = remove.all()
-    
+
     #
     # BUILD JSON RESULT
     #
@@ -454,7 +445,6 @@ def all(**kwargs):
     return result
 
 
-
 # Runs if script executed directly
 if __name__ == "__main__":
     print('#\n# COMPARE PROXMOX WITH NETBOX\n#')
@@ -463,10 +453,3 @@ if __name__ == "__main__":
     print('____________________________________\n')
     print('#\n# COMPARE PROXMOX WITH NETBOX\n#')
     remove.all()
-
-
-
-
-
-    
-    
