@@ -138,7 +138,7 @@ def site(**kwargs):
 #
 # dcim.devices (nodes)
 #
-def node(proxmox_node):
+def node(proxmox, proxmox_node):
     # Create json with basic NODE information
     node_json = {}
     node_json["name"] = proxmox_node['name']
@@ -147,7 +147,7 @@ def node(proxmox_node):
     node_json["site"] = site(site_id = NETBOX_SITE_ID).id
     node_json["status"] = 'active'
     node_json["tags"] = [extras.tag().id]
-    node_json["cluster"] = virtualization.cluster().id
+    node_json["cluster"] = virtualization.cluster(proxmox).id
 
     # Create Node with json 'node_json'
     try:

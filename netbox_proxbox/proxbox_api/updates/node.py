@@ -43,7 +43,7 @@ def status(netbox_node, proxmox_node):
 
 
 # Update CLUSTER field on /dcim/device/{id}
-def cluster(netbox_node, proxmox_node, proxmox_cluster):
+def cluster(proxmox, netbox_node, proxmox_node, proxmox_cluster):
     #
     # Compare CLUSTER
     #
@@ -51,7 +51,7 @@ def cluster(netbox_node, proxmox_node, proxmox_cluster):
         # If cluster is filled, but different from actual cluster, update it.
         if netbox_node.cluster.name != proxmox_cluster['name']:
             # Search for Proxmox Cluster using create.cluster() function
-            cluster_id = create.virtualization.cluster().id
+            cluster_id = create.virtualization.cluster(proxmox).id
 
             # Use Cluster ID to update NODE information
             netbox_node.cluster.id = cluster_id
@@ -67,7 +67,7 @@ def cluster(netbox_node, proxmox_node, proxmox_cluster):
     # If cluster is empty, update it.
     elif proxmox_cluster == None:
         # Search for Proxmox Cluster using create.cluster() function
-        cluster_id = create.virtualization.cluster().id
+        cluster_id = create.virtualization.cluster(proxmox).id
 
         # Use Cluster ID to update NODE information
         netbox_node.cluster.id = cluster_id

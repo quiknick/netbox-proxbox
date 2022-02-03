@@ -4,14 +4,14 @@ import re
 
 # PLUGIN_CONFIG variables
 from ..plugins_config import (
-    PROXMOX,
-    PROXMOX_PORT,
-    PROXMOX_USER,
-    PROXMOX_PASSWORD,
-    PROXMOX_SSL,
+    # PROXMOX,
+    # PROXMOX_PORT,
+    # PROXMOX_USER,
+    # PROXMOX_PASSWORD,
+    # PROXMOX_SSL,
     NETBOX,
     NETBOX_TOKEN,
-    PROXMOX_SESSION as proxmox,
+    # PROXMOX_SESSION as proxmox,
     NETBOX_SESSION as nb,
 )
 
@@ -170,7 +170,7 @@ def custom_fields(netbox_vm, proxmox_vm):
 
 
 # Update 'local_context_data' field on Netbox Virtual Machine based on Proxbox
-def local_context_data(netbox_vm, proxmox_vm):
+def local_context_data(netbox_vm, proxmox_vm, PROXMOX, PROXMOX_PORT):
     current_local_context = netbox_vm.local_context_data
 
     proxmox_values = {}
@@ -265,7 +265,7 @@ def resources(netbox_vm, proxmox_vm):
             return False
 
 
-def get_ip(node, vmid, type):
+def get_ip(proxmox, node, vmid, type):
     test_str = None
     try:
         if type == 'qemu':
@@ -293,10 +293,10 @@ def get_ip(node, vmid, type):
         pass
 
 
-def add_ip(netbox_vm, proxmox_vm):
+def add_ip(proxmox, netbox_vm, proxmox_vm):
     try:
         # Get the ip from the configuration of the vm
-        ip_addresses = get_ip(proxmox_vm['node'], proxmox_vm['vmid'], proxmox_vm['type'])
+        ip_addresses = get_ip(proxmox, proxmox_vm['node'], proxmox_vm['vmid'], proxmox_vm['type'])
         # if no ip is retrieve do nothing
         if ip_addresses is None:
             return False

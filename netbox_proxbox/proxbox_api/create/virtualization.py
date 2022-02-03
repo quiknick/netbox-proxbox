@@ -3,9 +3,8 @@ import sys
 # PLUGIN_CONFIG variables
 from ..plugins_config import (
     NETBOX_SESSION as nb,
-    PROXMOX_SESSION as proxmox,
-    NETBOX_VM_ROLE_ID,
-
+    # PROXMOX_SESSION as proxmox,
+    NETBOX_VM_ROLE_ID
 )
 
 from . import (
@@ -49,7 +48,7 @@ def cluster_type():
 #
 # virtualization.clusters
 #
-def cluster():
+def cluster(proxmox):
     #
     # Cluster
     #
@@ -88,7 +87,7 @@ def cluster():
 #
 # virtualization.virtual_machines
 #
-def virtual_machine(proxmox_vm):
+def virtual_machine(proxmox, proxmox_vm):
     # Create json with basic VM/CT information
     vm_json = {}
 
@@ -99,7 +98,7 @@ def virtual_machine(proxmox_vm):
 
     vm_json["name"] = proxmox_vm['name']
     vm_json["status"] = 'active'
-    vm_json["cluster"] = cluster().id
+    vm_json["cluster"] = cluster(proxmox).id
     vm_json["role"] = extras.role(role_id=NETBOX_VM_ROLE_ID).id
     vm_json["tags"] = [extras.tag().id]
 

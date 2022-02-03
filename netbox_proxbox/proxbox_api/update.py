@@ -1,13 +1,16 @@
 # PLUGIN_CONFIG variables
+import time
+from threading import Thread
 from .plugins_config import (
-    PROXMOX,
-    PROXMOX_PORT,
-    PROXMOX_USER,
-    PROXMOX_PASSWORD,
-    PROXMOX_SSL,
-    NETBOX,
-    NETBOX_TOKEN,
-    PROXMOX_SESSION as proxmox,
+    # PROXMOX,
+    # PROXMOX_PORT,
+    # PROXMOX_USER,
+    # PROXMOX_PASSWORD,
+    # PROXMOX_SSL,
+    # NETBOX,
+    # NETBOX_TOKEN,
+    # PROXMOX_SESSION as proxmox,
+    PROXMOX_SESSIONS as proxmox_sessions,
     NETBOX_SESSION as nb,
 )
 
@@ -19,7 +22,10 @@ from . import (
 
 
 # Call all functions to update Virtual Machine
-def vm_full_update(netbox_vm, proxmox_vm):
+def vm_full_update(proxmox_session, netbox_vm, proxmox_vm):
+    proxmox = proxmox_session.get('PROXMOX_SESSION')
+    PROXMOX = proxmox_session.get('PROXMOX')
+    PROXMOX_PORT = proxmox_session.get('PROXMOX_PORT')
     changes = {}
 
     # Update 'status' field, if necessary.
@@ -29,14 +35,14 @@ def vm_full_update(netbox_vm, proxmox_vm):
     custom_fields_updated = updates.virtual_machine.custom_fields(netbox_vm, proxmox_vm)
 
     # Update 'local_context_data' json, if necessary.
-    local_context_updated = updates.virtual_machine.local_context_data(netbox_vm, proxmox_vm)
+    local_context_updated = updates.virtual_machine.local_context_data(netbox_vm, proxmox_vm, PROXMOX, PROXMOX_PORT)
 
     # Update 'resources', like CPU, Memory and Disk, if necessary.
     resources_updated = updates.virtual_machine.resources(netbox_vm, proxmox_vm)
 
     tag_updated = updates.extras.tag(netbox_vm)
     #
-    ip_update = updates.virtual_machine.add_ip(netbox_vm, proxmox_vm)
+    ip_update = updates.virtual_machine.add_ip(proxmox, netbox_vm, proxmox_vm)
     # changes = [custom_fields_updated, status_updated, local_context_updated, resources_updated]
     changes = {
         "status": status_updated,
@@ -50,11 +56,11 @@ def vm_full_update(netbox_vm, proxmox_vm):
     return changes
 
 
-def node_full_update(netbox_node, proxmox_json, proxmox_cluster):
+def node_full_update(proxmox, netbox_node, proxmox_json, proxmox_cluster):
     changes = {}
 
     status_updated = updates.node.status(netbox_node, proxmox_json)
-    cluster_updated = updates.node.cluster(netbox_node, proxmox_json, proxmox_cluster)
+    cluster_updated = updates.node.cluster(proxmox, netbox_node, proxmox_json, proxmox_cluster)
 
     changes = {
         "status": status_updated,
@@ -78,7 +84,7 @@ def is_vm_on_netbox(netbox_vm):
     return vm_on_netbox
 
 
-def search_by_proxmox_id(proxmox_id):
+def search_by_proxmox_id(proxmox, proxmox_id):
     all_proxmox_vms = proxmox.cluster.resources.get(type='vm')
 
     for px_vm in all_proxmox_vms:
@@ -92,7 +98,7 @@ def search_by_proxmox_id(proxmox_id):
     return None
 
 
-def search_by_proxmox_name(proxmox_name):
+def search_by_proxmox_name(proxmox, proxmox_name):
     all_proxmox_vms = proxmox.cluster.resources.get(type='vm')
 
     for px_vm in all_proxmox_vms:
@@ -107,7 +113,7 @@ def search_by_proxmox_name(proxmox_name):
 
 
 def search_by_id(id):
-    # Save Netbox VirtualMachine object
+    # Get Netbox VirtualMachine object
     netbox_obj = nb.virtualization.virtual_machines.get(id)
 
     proxmox_name = netbox_obj.name
@@ -129,6 +135,9 @@ def search_by_id(id):
 
 # Makes all necessary checks so that VM/CT exist on Netbox.
 def virtual_machine(**kwargs):
+    print('[OK] STARTING PROCESS FOR VIRTUAL MACHINE')
+    proxmox_session = kwargs.get('proxmox_session')
+    proxmox = proxmox_session.get('PROXMOX_SESSION')
     # JSON containing the result of the VM changes
     json_vm = {}
 
@@ -204,7 +213,7 @@ def virtual_machine(**kwargs):
 
             # Search using Proxmox ID
             if 'int' in str(search_result_type):
-                proxmox_json = search_by_proxmox_id(search_result)
+                proxmox_json = search_by_proxmox_id(proxmox, search_result)
 
                 # Analyze search result and returns error, if null value.
                 if proxmox_json == None:
@@ -216,7 +225,7 @@ def virtual_machine(**kwargs):
 
             # Search using Proxmox NAME
             elif 'str' in str(search_result_type):
-                proxmox_json = search_by_proxmox_name(search_result)
+                proxmox_json = search_by_proxmox_name(proxmox, search_result)
 
                 # Analyze search result and returns error, if null value.
                 if proxmox_json == None:
@@ -229,7 +238,7 @@ def virtual_machine(**kwargs):
         else:
             # Search VM JSON of Proxmox using argument 'proxmox_id'
             if proxmox_id != None:
-                proxmox_json = search_by_proxmox_id(proxmox_id)
+                proxmox_json = search_by_proxmox_id(proxmox, proxmox_id)
 
                 # Analyze search result and returns error, if null value.
                 if proxmox_json == None:
@@ -242,7 +251,7 @@ def virtual_machine(**kwargs):
             else:
                 # Search using Proxmox NAME
                 if name != None:
-                    proxmox_json = search_by_proxmox_name(name)
+                    proxmox_json = search_by_proxmox_name(proxmox, name)
 
                     # Analyze search result and returns error, if null value.
                     if proxmox_json == None:
@@ -256,15 +265,34 @@ def virtual_machine(**kwargs):
         return False
 
     # Search Netbox object by name gotten from Proxmox
-    netbox_vm = nb.virtualization.virtual_machines.get(name=proxmox_vm_name)
+    # netbox_vm = nb.virtualization.virtual_machines.get(name=proxmox_vm_name)
+    print('[OK] Getting node')
+    node = proxmox_json['node']
+    print('[OK] Getting cluster')
+    cluster = None
+    try:
+        cluster = kwargs.get('cluster')
+    except Exception as e:
+        cluster = None
+    if cluster is None:
+        cluster = create.virtualization.cluster(proxmox)
 
+    print('[OK] Getting vmid')
+    vmid = proxmox_json['vmid']
+    print('[OK] Getting getting vm from netbox for {} , {}, {}'.format(cluster.name, vmid, node))
+    netbox_vm_all = nb.virtualization.virtual_machines.filter(cluster=cluster.name, cf_proxmox_id=vmid,
+                                                              cf_proxmox_node=node)
+    netbox_vm = None
+    for vm in netbox_vm_all:
+        netbox_vm = vm
+        break
     # Analyze if VM exist on Netbox
     # If VM/CT already exist on Proxmox, check VM and update it, if necessary.
     vm_on_netbox = is_vm_on_netbox(netbox_vm)
 
     if vm_on_netbox == True:
         # Update Netbox information
-        full_update = vm_full_update(netbox_vm, proxmox_json)
+        full_update = vm_full_update(proxmox_session, netbox_vm, proxmox_json)
         json_vm["changes"] = full_update
 
         full_update_list = list(full_update.values())
@@ -283,12 +311,12 @@ def virtual_machine(**kwargs):
         print('[OK] VM does not exist on Netbox -> {}'.format(proxmox_vm_name))
 
         # Analyze if VM was sucessfully created.
-        netbox_vm = create.virtualization.virtual_machine(proxmox_json)
+        netbox_vm = create.virtualization.virtual_machine(proxmox, proxmox_json)
 
         # VM created with basic information
         if netbox_vm != None:
             # Update rest of configuration
-            full_update = vm_full_update(netbox_vm, proxmox_json)
+            full_update = vm_full_update(proxmox_session, netbox_vm, proxmox_json)
             json_vm["changes"] = full_update
 
             full_update_list = list(full_update.values())
@@ -317,17 +345,15 @@ def virtual_machine(**kwargs):
 
         # Unexpected error
         json_vm["result"] = False
-
+    # result[index] = json_vm
+    print('[OK] FINISH PROCESS FOR VIRTUAL MACHINE')
     return json_vm
-
-
-def interface(**kwargs):
-    pass
 
 
 def nodes(**kwargs):
     proxmox_cluster = kwargs.get('proxmox_cluster')
     proxmox_json = kwargs.get('proxmox_json')
+    proxmox = kwargs.get('proxmox')
 
     proxmox_node_name = proxmox_json.get("name")
 
@@ -339,14 +365,14 @@ def nodes(**kwargs):
     # Search node on Netbox with Proxmox node name gotten
     if nb.dcim.devices.get(name=proxmox_node_name) == None:
         # If node does not exist, create it.
-        netbox_node = create.dcim.node(proxmox_json)
+        netbox_node = create.dcim.node(proxmox, proxmox_json)
 
         # Node created
         if netbox_node != None:
             print("[OK] Node created! -> {}".format(proxmox_node_name))
 
             # Update rest of configuration
-            full_update = node_full_update(netbox_node, proxmox_json, proxmox_cluster)
+            full_update = node_full_update(proxmox, netbox_node, proxmox_json, proxmox_cluster)
             json_node["changes"] = full_update
 
             full_update_list = list(full_update.values())
@@ -370,7 +396,7 @@ def nodes(**kwargs):
         netbox_node = netbox_search
 
         # Update Netbox node information, if necessary.
-        full_update = node_full_update(netbox_node, proxmox_json, proxmox_cluster)
+        full_update = node_full_update(proxmox, netbox_node, proxmox_json, proxmox_cluster)
         json_node["changes"] = full_update
 
         full_update_list = list(full_update.values())
@@ -387,15 +413,70 @@ def nodes(**kwargs):
     return json_node
 
 
+def run_process_in_thread(proxmox_session, key, result, index, **kwargs):
+    output = {}
+    try:
+        print("Processing data for: {0}".format(key))
+        output = process_all_in_session(proxmox_session, **kwargs)
+        result[index] = output
+    except Exception as e:
+        message = "OS error: {0}".format(e)
+        print(message)
+        result[index] = {
+            'message': message
+        }
+    return output
+
+
 # Makes everything needed so that VIRTUAL MACHINES / CONTAINERS, NODES and CLUSTER exists on Netbox
 def all(**kwargs):
+    run_with_threads = kwargs.get("run_with_threads", True)
+    start_time = time.time()
+    result = []
+    if run_with_threads:
+        print("Start process with threading")
+        threads = [None] * len(proxmox_sessions)
+        results = [None] * len(proxmox_sessions)
+        i = 0
+        for key in proxmox_sessions:
+            proxmox_session = proxmox_sessions[key]
+            threads[i] = Thread(target=run_process_in_thread, args=(proxmox_session, key, results, i), kwargs=kwargs)
+            threads[i].start()
+            i = i + 1
+
+        p = len(threads)
+        r = range(p)
+        for i in r:
+            threads[(p - 1) - i].join()
+    else:
+        print("Start process Sequential")
+        for key in proxmox_sessions:
+            try:
+                session = proxmox_sessions[key]
+                print("Processing data for: {0}".format(key))
+                output = process_all_in_session(session, **kwargs)
+                result.append(output)
+            except Exception as e:
+                message = "OS error: {0}".format(e)
+                print(message)
+                output = {
+                    'message': message
+                }
+                result.append(output)
+
+    print("--- %s seconds ---" % (time.time() - start_time))
+    return results
+
+
+def process_all_in_session(proxmox_session, **kwargs):
     print("[Proxbox - Netbox plugin | Update All]")
+    proxmox = proxmox_session.get('PROXMOX_SESSION')
     cluster_all = proxmox.cluster.status.get()
 
     #
     # CLUSTER
     #
-    cluster = create.virtualization.cluster()
+    cluster = create.virtualization.cluster(proxmox)
     print('\n\n\nCLUSTER...')
     print('[OK] CLUSTER created. -> {}'.format(cluster.name))
 
@@ -409,8 +490,7 @@ def all(**kwargs):
 
     # Get all NODES from Proxmox
     for px_node_each in proxmox_nodes:
-        node_updated = nodes(proxmox_json=px_node_each, proxmox_cluster=proxmox_cluster)
-
+        node_updated = nodes(proxmox_json=px_node_each, proxmox_cluster=proxmox_cluster, proxmox=proxmox)
         nodes_list.append(node_updated)
 
     #
@@ -421,9 +501,10 @@ def all(**kwargs):
 
     print('\nUPDATE ALL...')
     # Get all VM/CTs from Proxmox
-    for px_vm_each in proxmox.cluster.resources.get(type='vm'):
-        vm_updated = virtual_machine(proxmox_json=px_vm_each)
+    node_vms_all = proxmox.cluster.resources.get(type='vm')
 
+    for px_vm_each in node_vms_all:
+        vm_updated = virtual_machine(proxmox_json=px_vm_each, proxmox_session=proxmox_session, cluster=cluster)
         virtualmachines_list.append(vm_updated)
 
     # Get "remove_unused" passed on function call
@@ -432,7 +513,7 @@ def all(**kwargs):
     # Remove Netbox's old data
     if remove_unused == True:
         print('\nREMOVE UNUSED DATA...')
-        remove_info = remove.all()
+        remove_info = remove.all(proxmox_session)
 
     #
     # BUILD JSON RESULT
@@ -450,6 +531,6 @@ if __name__ == "__main__":
     print('#\n# COMPARE PROXMOX WITH NETBOX\n#')
     all()
 
-    print('____________________________________\n')
-    print('#\n# COMPARE PROXMOX WITH NETBOX\n#')
-    remove.all()
+    # print('____________________________________\n')
+    # print('#\n# COMPARE PROXMOX WITH NETBOX\n#')
+    # remove.all()

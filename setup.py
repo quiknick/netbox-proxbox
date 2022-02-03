@@ -46,8 +46,8 @@ setup(
     long_description_content_type="text/markdown",
     classifiers=[
         "Programming Language :: Python :: 3",
-	"Framework :: Django",
-	"Operating System :: Unix",
+        "Framework :: Django",
+        "Operating System :: Unix",
         "License :: OSI Approved :: Apache Software License",
     ],
     keywords="netbox netbox-plugin plugin proxmox proxmoxer pynetbox",
@@ -57,11 +57,11 @@ setup(
     packages=find_packages(),
     include_package_data=True,
     package_data={
-        "": ['*','*/*','*/*/*'],
+        "": ['*', '*/*', '*/*/*'],
     },
     install_requires=requires,
     extras_require={
         "dev": dev_requires,
     },
-    python_requires= '>=3.6',
+    python_requires='>=3.6',
 )
