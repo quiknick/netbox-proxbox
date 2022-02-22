@@ -1,4 +1,7 @@
+import os
+import pytz
 import uuid
+from datetime import datetime
 # Provides standard field types like 'CharField' and 'ForeignKey'
 from django.db import models
 
@@ -13,11 +16,16 @@ from extras.models.models import ChangeLoggedModel
 
 # Class defined by Netbox to define (choice) the VM operational status
 from netbox_proxbox.choices import TaskTypeChoices, TaskStatusChoices
+from netbox_proxbox.mixin.ModelDiffMixin import ModelDiffMixin
 from virtualization.models import VirtualMachineStatusChoices
 
 # 'RestrictedQuerySet' will make it possible to filter out objects 
 # for which user doest nothave specific rights
 from utilities.querysets import RestrictedQuerySet
+from django.dispatch import receiver
+from django.db.models.signals import pre_save
+
+TIME_ZONE = os.environ.get("TIME_ZONE", "UTC")
 
 
 # model class that subclasses 'ChangeLoggedModel'
@@ -91,7 +99,7 @@ class ProxmoxVM(ChangeLoggedModel):
     """
 
 
-class SyncTask(ChangeLoggedModel):
+class SyncTask(ModelDiffMixin, ChangeLoggedModel):
     task_id = models.UUIDField(default=uuid.uuid4, editable=False, unique=True)
     name = models.CharField(max_length=255, blank=True, null=True)
     job_id = models.CharField(max_length=255, blank=True, null=True)
@@ -101,12 +109,14 @@ class SyncTask(ChangeLoggedModel):
     message = models.CharField(max_length=512, blank=True, null=True)
     fail_reason = models.CharField(max_length=512, blank=True, null=True)
     done = models.BooleanField(default=False)
+    remove_unused = models.BooleanField(default=True)
     scheduled_time = models.DateTimeField(blank=True)
     start_time = models.DateTimeField(null=True)
     end_time = models.DateTimeField(null=True)
     duration = models.PositiveIntegerField(blank=True, null=True)
     log = models.TextField(blank=True)
     user = models.CharField(max_length=255, blank=True)
+    domain = models.CharField(max_length=255, blank=True, null=True)
     parent = models.ForeignKey(
         to='self',
         on_delete=models.CASCADE,
@@ -135,3 +145,11 @@ class SyncTask(ChangeLoggedModel):
     )
     # Retrieve and filter 'ProxmoxVM' records
     objects = RestrictedQuerySet.as_manager()
+
+    def save(self, *args, **kwargs):
+        if 'message' in self.diff or self._state.adding:
+            if self.log is None or self.log == '':
+                self.log = self.message + '\n'
+            else:
+                self.log += self.message + '\n'
+        super(SyncTask, self).save(*args, **kwargs)
