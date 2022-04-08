@@ -1,6 +1,11 @@
 # tables.py
 import django_tables2 as tables
-from utilities.tables import BaseTable
+
+try:
+    from utilities.tables import BaseTable
+except:
+    from netbox.tables import BaseTable
+
 from .models import ProxmoxVM
 
 
