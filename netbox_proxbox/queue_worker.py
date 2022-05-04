@@ -351,56 +351,121 @@ def set_vm(vm_info_task, cluster=None):
     return netbox_vm
 
 
+#
+# @job(QUEUE_NAME)
+# def update_vm_custom_fields(vm_info_task_id, cluster, netbox_vm):
+#     try:
+#         print("\n\n***>Processing update_vm_custom_fields<***")
+#         vm_info_task = get_process_vm(vm_info_task_id)
+#         proxmox_json = vm_info_task.data_instance
+#
+#         cluster, vmid, node, proxmox_vm_name, proxmox_session, proxmox = nb_search_data_(proxmox_json,
+#                                                                                          vm_info_task.domain, cluster)
+#         if netbox_vm is None:
+#             print("===>Getting vm from db")
+#             netbox_vm = get_nb_by_(cluster.name, vmid, node, proxmox_vm_name)
+#
+#         # Update 'custom_fields' field, if necessary.
+#         print("===>Update 'custom_fields' field, if necessary.")
+#         custom_fields_updated = updates.virtual_machine.custom_fields(netbox_vm, proxmox_json)
+#
+#         print(custom_fields_updated)
+#
+#         # process_vm_info_args = [vm_info_task.task_id]
+#         # print(f'42. Run the next function (update_vm_status_queue for {vm_info_task_id}) ')
+#         # queue_next_sync(vm_info_task, update_vm_status_queue, process_vm_info_args, 'update_vm_status_queue')
+#
+#         print("FINISH update_vm_custom_fields")
+#     except Exception as e:
+#         print(e)
+#         return "Error"
+#
+#
+# @job(QUEUE_NAME)
+# def update_vm_status_queue(vm_info_task_id, cluster=None, netbox_vm=None):
+#     try:
+#         print("\n\n***>Processing update_vm_status_queue<***")
+#         vm_info_task = get_process_vm(vm_info_task_id)
+#         proxmox_json = vm_info_task.data_instance
+#
+#         cluster, vmid, node, proxmox_vm_name, proxmox_session, proxmox = nb_search_data_(proxmox_json,
+#                                                                                          vm_info_task.domain, cluster)
+#
+#         if netbox_vm is None:
+#             print("===>Getting vm from db")
+#             netbox_vm = get_nb_by_(cluster.name, vmid, node, proxmox_vm_name)
+#
+#         print("===>Update 'status' field, if necessary.")
+#         status_updated = updates.virtual_machine.status(netbox_vm, proxmox_json)
+#         print(status_updated)
+#
+#         process_vm_info_args = [vm_info_task.task_id, cluster, netbox_vm]
+#         print(f'42. Run the next function (update_vm_status_queue for {vm_info_task_id}) ')
+#         queue_next_sync(vm_info_task, update_vm_custom_fields, process_vm_info_args, 'update_vm_custom_fields')
+#
+#         print("FINISH update_vm_status_queue")
+#     except Exception as e:
+#         print(e)
+#         return "Error"
+
+
 @job(QUEUE_NAME)
-def update_vm_custom_fields(vm_info_task_id, cluster, netbox_vm):
+def update_vm_process(vm_info_task_id, cluster=None, netbox_vm=None, step='finish'):
     try:
-        print("\n\n***>Processing update_vm_custom_fields<***")
+        print("\n\n***>Processing update_vm_process<***")
         vm_info_task = get_process_vm(vm_info_task_id)
         proxmox_json = vm_info_task.data_instance
-
+        next_step = 'finish'
         cluster, vmid, node, proxmox_vm_name, proxmox_session, proxmox = nb_search_data_(proxmox_json,
                                                                                          vm_info_task.domain, cluster)
+
         if netbox_vm is None:
             print("===>Getting vm from db")
             netbox_vm = get_nb_by_(cluster.name, vmid, node, proxmox_vm_name)
 
-        # Update 'custom_fields' field, if necessary.
-        print("===>Update 'custom_fields' field, if necessary.")
-        custom_fields_updated = updates.virtual_machine.custom_fields(netbox_vm, proxmox_json)
+        print(f'***>SELECTING OPTION FOR: {step}<***')
+        if step == 'status':
+            print("===>Update 'status' field, if necessary.")
+            status_updated = updates.virtual_machine.status(netbox_vm, proxmox_json)
+            print(status_updated)
+            next_step = 'custom_fields'
+        elif step == 'custom_fields':
+            # Update 'local_context_data' json, if necessary.
+            print("===>Update 'local_context_data' json, if necessary.")
+            PROXMOX = proxmox_session.get('PROXMOX')
+            PROXMOX_PORT = proxmox_session.get('PROXMOX_PORT')
+            local_context_updated = updates.virtual_machine.local_context_data(netbox_vm, proxmox_json, PROXMOX,
+                                                                               PROXMOX_PORT)
+            print(local_context_updated)
+            next_step = 'local_context'
+        elif step == 'local_context':
+            # Update 'resources', like CPU, Memory and Disk, if necessary.
+            print("===>Update 'resources', like CPU, Memory and Disk, if necessary.")
+            resources_updated = updates.virtual_machine.resources(netbox_vm, proxmox_json)
+            print(resources_updated)
+            next_step = 'tags'
+        elif step == 'tags':
+            print("===>Update tags")
+            print(netbox_vm)
+            try:
+                tag_updated = updates.extras.tag(netbox_vm)
+                print(tag_updated)
+            except Exception as e:
+                print(e)
+                raise e
+            next_step = 'add_ip'
+        elif step == 'add_ip':
+            print("===>Update ips")
+            ip_update = updates.virtual_machine.add_ip(proxmox, netbox_vm, proxmox_json)
+            print(ip_update)
+            next_step = 'finish'
 
-        print(custom_fields_updated)
-
-        # process_vm_info_args = [vm_info_task.task_id]
-        # print(f'42. Run the next function (update_vm_status_queue for {vm_info_task_id}) ')
-        # queue_next_sync(vm_info_task, update_vm_status_queue, process_vm_info_args, 'update_vm_status_queue')
-
-        print("FINISH update_vm_custom_fields")
-    except Exception as e:
-        print(e)
-        return "Error"
-
-
-@job(QUEUE_NAME)
-def update_vm_status_queue(vm_info_task_id, cluster=None, netbox_vm=None):
-    try:
-        print("\n\n***>Processing update_vm_status_queue<***")
-        vm_info_task = get_process_vm(vm_info_task_id)
-        proxmox_json = vm_info_task.data_instance
-
-        cluster, vmid, node, proxmox_vm_name, proxmox_session, proxmox = nb_search_data_(proxmox_json,
-                                                                                         vm_info_task.domain, cluster)
-
-        if netbox_vm is None:
-            print("===>Getting vm from db")
-            netbox_vm = get_nb_by_(cluster.name, vmid, node, proxmox_vm_name)
-
-        print("===>Update 'status' field, if necessary.")
-        status_updated = updates.virtual_machine.status(netbox_vm, proxmox_json)
-        print(status_updated)
-
-        process_vm_info_args = [vm_info_task.task_id, cluster, netbox_vm]
-        print(f'42. Run the next function (update_vm_status_queue for {vm_info_task_id}) ')
-        queue_next_sync(vm_info_task, update_vm_custom_fields, process_vm_info_args, 'update_vm_custom_fields')
+        if step == 'finish':
+            print('FINISH ALL PROCESS')
+        else:
+            process_vm_info_args = [vm_info_task.task_id, cluster, netbox_vm, next_step]
+            print(f'42. Run the next function (update_vm_status_queue for {vm_info_task_id}) ')
+            queue_next_sync(vm_info_task, update_vm_process, process_vm_info_args, 'update_vm_process')
 
         print("FINISH update_vm_status_queue")
     except Exception as e:
@@ -423,9 +488,9 @@ def process_vm_info2(vm_info_task_id, cluster=None):
         # vm_full_update(proxmox_session, netbox_vm, proxmox_json)
         # print("FINISH process_vm_info2")
 
-        process_vm_info_args = [vm_info_task.task_id, cluster, netbox_vm]
-        print(f'42. Run the next function (update_vm_status_queue for {vm_info_task_id}) ')
-        queue_next_sync(vm_info_task, update_vm_status_queue, process_vm_info_args, 'update_vm_status_queue')
+        process_vm_info_args = [vm_info_task.task_id, cluster, netbox_vm, 'status']
+        print(f'42. Run the next function (update_vm_process for {vm_info_task_id}) ')
+        queue_next_sync(vm_info_task, update_vm_process, process_vm_info_args, 'update_vm_process')
 
     except Exception as e:
         print(e)
