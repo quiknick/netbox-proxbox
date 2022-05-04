@@ -87,7 +87,7 @@ def cluster(proxmox):
 #
 # virtualization.virtual_machines
 #
-def virtual_machine(proxmox, proxmox_vm):
+def get_virtual_machine_data(proxmox, proxmox_vm):
     # Create json with basic VM/CT information
     vm_json = {}
 
@@ -101,13 +101,20 @@ def virtual_machine(proxmox, proxmox_vm):
     vm_json["cluster"] = cluster(proxmox).id
     vm_json["role"] = extras.role(role_id=NETBOX_VM_ROLE_ID).id
     vm_json["tags"] = [extras.tag().id]
+    return vm_json
 
+
+def virtual_machine(proxmox, proxmox_vm):
     # Create VM/CT with json 'vm_json'
+    vm_json = get_virtual_machine_data(proxmox, proxmox_vm)
     try:
         netbox_obj = nb.virtualization.virtual_machines.create(vm_json)
+        print("VIRTUAL MACHINE CREATED")
+        print(netbox_obj)
 
-    except:
+    except Exception as e:
         print("[proxbox.create.virtual_machine] Creation of VM/CT failed.")
+        print(e)
         netbox_obj = None
 
     else:
@@ -116,6 +123,3 @@ def virtual_machine(proxmox, proxmox_vm):
     # In case nothing works, returns error
     netbox_obj = None
     return netbox_obj
-
-
-

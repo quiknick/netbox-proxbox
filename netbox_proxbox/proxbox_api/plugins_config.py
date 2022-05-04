@@ -22,7 +22,6 @@ DEFAULT_PROXMOX_SETTING = {
     'domain': 'proxbox.example.com',  # May also be IP address
     'http_port': 8006,
     'user': 'root@pam',
-    'password': 'Strong@P4ssword',
     'token': {
         'name': 'tokenID',
         'value': '039az154-23b2-4be0-8d20-b66abc8c4686'
@@ -42,7 +41,7 @@ DEFAULT_PROXMOX_SSL = DEFAULT_PROXMOX_SETTING.get("ssl")
 
 # ACCESS
 DEFAULT_PROXMOX_USER = DEFAULT_PROXMOX_SETTING.get("user")
-DEFAULT_PROXMOX_PASSWORD = DEFAULT_PROXMOX_SETTING.get("password")
+# DEFAULT_PROXMOX_PASSWORD = DEFAULT_PROXMOX_SETTING.get("password")
 
 DEFAULT_PROXMOX_TOKEN = DEFAULT_PROXMOX_SETTING.get("token")
 DEFAULT_PROXMOX_TOKEN_NAME = DEFAULT_PROXMOX_TOKEN.get("name", None)
@@ -113,7 +112,7 @@ def get_proxmox_session(PROXMOX_SETTING):
 
     # ACCESS
     PROXMOX_USER = PROXMOX_SETTING.get("user", DEFAULT_PROXMOX_USER)
-    PROXMOX_PASSWORD = PROXMOX_SETTING.get("password", DEFAULT_PROXMOX_PASSWORD)
+    # PROXMOX_PASSWORD = PROXMOX_SETTING.get("password", DEFAULT_PROXMOX_PASSWORD)
 
     PROXMOX_TOKEN = PROXMOX_SETTING.get("token", DEFAULT_PROXMOX_TOKEN)
     if PROXMOX_TOKEN != None:

@@ -1,9 +1,10 @@
 # from django.<a href="http" target="_blank">http</a> import HttpResponse
+import django_rq
 from django.http import HttpResponse
 from django.urls import path
 from django_rq import get_queue
 from netbox_proxbox.proxbox_api.plugins_config import QUEUE_NAME
-from netbox_proxbox.worker import start_sync
+from netbox_proxbox.queue_worker import start_sync
 
 from .views import (
     ProxmoxVMCreateView,
@@ -35,16 +36,23 @@ def full_update_view(request):
 
 
 def start_sync_request(request):
+    # queue = django_rq.get_queue(QUEUE_NAME)
+
+    # queue.enqueue(start_sync, None, request.)
+    queue = get_queue(QUEUE_NAME)
+    queue_job = queue.enqueue_job(
+        queue.create_job(
+            func=start_sync,
+            args=[None, request.user.username, True],
+        )
+    )
+    print('Job queue')
     # queue = get_queue(QUEUE_NAME)
     # queue_job = queue.enqueue_job(
     #     start_sync,
-    #     None
-    #     # queue.create_job(
-    #     #     func="netbox_proxmox.worker.start_cluster_sync",
-    #     #     args=[None]
-    #     # )
+    #     args=(None, request.user.username, True)
     # )
-    queue_job = start_sync.delay(None, request.user.username)
+    # queue_job = start_sync.delay(None, request.user.username)
     # html = "<html><body><h1>Update all Proxmox information</h1>{}<br><h1>Remove all useless information (like deleted VMs)</h1>{}</body></html>".format(update_all_json, remove_all_json)
     html = "<html><body><h1>Sync Netbox information based on Proxmox, updating and removing data.</h1><br> queue job id{}".format(
         queue_job.id)

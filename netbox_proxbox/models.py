@@ -100,6 +100,7 @@ class ProxmoxVM(ChangeLoggedModel):
 
 
 class SyncTask(ModelDiffMixin, ChangeLoggedModel):
+
     task_id = models.UUIDField(default=uuid.uuid4, editable=False, unique=True)
     name = models.CharField(max_length=255, blank=True, null=True)
     job_id = models.CharField(max_length=255, blank=True, null=True)
@@ -143,6 +144,12 @@ class SyncTask(ModelDiffMixin, ChangeLoggedModel):
         null=True,
         verbose_name="Proxmox VM/CT"
     )
+    data_instance = models.JSONField(
+        blank=True,
+        null=True
+    )
+    progress = models.PositiveIntegerField(blank=True, null=True)
+    progress_status = models.CharField(max_length=255, blank=True, null=True)
     # Retrieve and filter 'ProxmoxVM' records
     objects = RestrictedQuerySet.as_manager()
 

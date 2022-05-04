@@ -29,19 +29,25 @@ def vm_full_update(proxmox_session, netbox_vm, proxmox_vm):
     changes = {}
 
     # Update 'status' field, if necessary.
+    print("===>Update 'status' field, if necessary.")
     status_updated = updates.virtual_machine.status(netbox_vm, proxmox_vm)
 
     # Update 'custom_fields' field, if necessary.
+    print("===>Update 'custom_fields' field, if necessary.")
     custom_fields_updated = updates.virtual_machine.custom_fields(netbox_vm, proxmox_vm)
 
     # Update 'local_context_data' json, if necessary.
+    print("===>Update 'local_context_data' json, if necessary.")
     local_context_updated = updates.virtual_machine.local_context_data(netbox_vm, proxmox_vm, PROXMOX, PROXMOX_PORT)
 
     # Update 'resources', like CPU, Memory and Disk, if necessary.
+    print("===>Update 'resources', like CPU, Memory and Disk, if necessary.")
     resources_updated = updates.virtual_machine.resources(netbox_vm, proxmox_vm)
 
+    print("===>Update tags")
     tag_updated = updates.extras.tag(netbox_vm)
     #
+    print("===>Update ips")
     ip_update = updates.virtual_machine.add_ip(proxmox, netbox_vm, proxmox_vm)
     # changes = [custom_fields_updated, status_updated, local_context_updated, resources_updated]
     changes = {
