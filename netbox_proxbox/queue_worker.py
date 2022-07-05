@@ -57,13 +57,18 @@ def queue_next_sync(
         sync_task,
         next_queue,
         next_queue_args=None,
-        next_queue_function_string=None
+        next_queue_function_string=None,
+        task_Status=None
 ):
     print('15. Queueing the next execution')
     if sync_task is None:
         print('The task is none')
         raise Exception("Object sync_task can't be None")
-    status = TaskStatusChoices.STATUS_RUNNING
+    if task_Status is not None:
+        status = task_Status
+    else:
+        status = TaskStatusChoices.STATUS_RUNNING
+
     msg = 'Queue next sync'
     if next_queue_function_string is not None and next_queue_function_string != '':
         msg = msg + next_queue_function_string
@@ -76,16 +81,20 @@ def queue_next_sync(
 
     # Save the task
     print('16. Save the task')
-    sync_task.save()
-    queue = get_queue(QUEUE_NAME)
-    queue_job = queue.enqueue_job(
-        queue.create_job(
-            func=next_queue,
-            args=next_queue_args,
+    try:
+        sync_task.save()
+        queue = get_queue(QUEUE_NAME)
+        queue_job = queue.enqueue_job(
+            queue.create_job(
+                func=next_queue,
+                args=next_queue_args,
+            )
         )
-    )
-    sync_task.job_id = queue_job.id
-    sync_task.save()
+        sync_task.job_id = queue_job.id
+        sync_task.save()
+    except Exception as e:
+        print(e)
+        raise e
     print(f'17. Next task successfully queue with id: {queue_job.id}')
     return sync_task
 
@@ -351,6 +360,7 @@ def set_vm(vm_info_task, cluster=None):
     return netbox_vm
 
 
+
 #
 # @job(QUEUE_NAME)
 # def update_vm_custom_fields(vm_info_task_id, cluster, netbox_vm):
@@ -408,52 +418,40 @@ def set_vm(vm_info_task, cluster=None):
 #         print(e)
 #         return "Error"
 
-
 @job(QUEUE_NAME)
-def clean_cluster(cluster_task_id):
-    print("\n\n***>Processing clean_cluster<***")
-    cluster_task = SyncTask.objects.get(id=cluster_task_id)
-    job_task = SyncTask.objects.get(id=cluster_task.parent_id)
-    job_children = SyncTask.objects.filter(parent_id=job_task.id, done=False).count()
-    if job_children > 0:
+def clean_left(id):
+    print("\n\n***>Processing clean_left<***")
+    children_task = SyncTask.objects.get(id=id)
+    if children_task.parent_id is None:
+        if not children_task.done:
+            children_task.done = True
+            children_task.status = TaskStatusChoices.STATUS_SUCCEEDED
+            children_task.save()
+            sync_task = get_or_create_sync_job(None, children_task.user, children_task.remove_unused)
+            current_queue_args = [
+                sync_task.task_id, children_task.user, children_task.remove_unused
+            ]
+            delay_sync(sync_task, start_sync, current_queue_args, 60)
+        return
+    father_task = SyncTask.objects.get(id=children_task.parent_id)
+    all_children_count = SyncTask.objects.filter(parent_id=father_task.id, done=False).count()
+    if all_children_count > 0:
+        print(f'48. All clusters have not being finish')
         current_queue_args = [
-            cluster_task_id
+            id
         ]
-        cluster_data = delay_sync(cluster_task, clean_node, current_queue_args, 5)
+        cluster_data = delay_sync(children_task, clean_left, current_queue_args, 1)
     else:
-        if not job_children.done:
-            job_children.done = True
-            job_children.status = TaskStatusChoices.STATUS_SUCCEEDED
-            job_children.save()
+        print(f'49. No cluster left to process')
+        if not father_task.done and father_task.parent_id is not None:
+            father_task.done = True
+            father_task.status = TaskStatusChoices.STATUS_SUCCEEDED
+            father_task.save()
 
-        sync_task = get_or_create_sync_job(None, job_task.user, job_task.remove_unused)
         current_queue_args = [
-            sync_task.task_id, job_task.user, job_task.remove_unused
+            father_task.id
         ]
-        delay_sync(sync_task, start_sync, current_queue_args, 60)
-
-
-@job(QUEUE_NAME)
-def clean_node(node_task_id):
-    print("\n\n***>Processing finish_vm_process<***")
-    node_task = SyncTask.objects.get(id=node_task_id)
-    cluster_task = SyncTask.objects.get(id=node_task.parent_id)
-    cluster_children = SyncTask.objects.filter(parent_id=cluster_task.id, done=False).count()
-    if cluster_children > 0:
-        current_queue_args = [
-            node_task_id
-        ]
-        cluster_data = delay_sync(node_task, clean_node, current_queue_args, 1)
-    else:
-        if not node_task.done:
-            node_task.done = True
-            node_task.status = TaskStatusChoices.STATUS_SUCCEEDED
-            node_task.save()
-        current_queue_args = [
-            cluster_task.id
-        ]
-        queue_next_sync(cluster_task, clean_cluster, current_queue_args, 'clean_cluster')
-
+        queue_next_sync(children_task, clean_left, current_queue_args, 'clean_left', TaskStatusChoices.STATUS_SUCCEEDED)
 
 @job(QUEUE_NAME)
 def finish_vm_process(vm_info_task_id):
@@ -462,12 +460,13 @@ def finish_vm_process(vm_info_task_id):
     vm_info_task.status = TaskStatusChoices.STATUS_SUCCEEDED
     vm_info_task.done = True
     vm_info_task.save()
-    node_task_id = SyncTask.objects.get(id=vm_info_task.parent_id)
+    # node_task_id = SyncTask.objects.get(id=vm_info_task.parent_id)
     current_queue_args = [
-        vm_info_task.parent_id
+        vm_info_task.id
     ]
+    queue_next_sync(vm_info_task, clean_left, current_queue_args, 'clean_left', TaskStatusChoices.STATUS_SUCCEEDED)
     print("FINISH finish_vm_process")
-    cluster_data = delay_sync(node_task_id, clean_node, current_queue_args, 5)
+    # cluster_data = delay_sync(vm_info_task, clean_vms, current_queue_args, 1)
 
 
 @job(QUEUE_NAME)
@@ -523,6 +522,9 @@ def update_vm_process(vm_info_task_id, cluster=None, netbox_vm=None, step='finis
 
         if step == 'finish':
             print('FINISH ALL PROCESS')
+            process_vm_info_args = [vm_info_task.task_id]
+            print(f'42. Run the next function (update_vm_status_queue for {vm_info_task_id}) ')
+            queue_next_sync(vm_info_task, finish_vm_process, process_vm_info_args, 'clean_node')
         else:
             process_vm_info_args = [vm_info_task.task_id, cluster, netbox_vm, next_step]
             print(f'42. Run the next function (update_vm_status_queue for {vm_info_task_id}) ')
@@ -665,7 +667,10 @@ def get_vms_for_the_node(node_task_id, task_id, iteration=0):
         cluster = create.virtualization.cluster(proxmox)
         vm_task.data_instance = node_vms_all
         vm_task.save()
+        counter = 0
         for px_vm_each in node_vms_all:
+            if counter > 5:
+                break
             print(px_vm_each)
             process_vm_info_args = [
                 vm_task.task_id, px_vm_each, cluster, None
@@ -674,6 +679,7 @@ def get_vms_for_the_node(node_task_id, task_id, iteration=0):
             print(f'34. Run the next function (process_vm_info for {domain}) ')
             print(process_vm_info_args)
             queue_next_sync(vm_task, process_vm_info, process_vm_info_args, 'process_vm_info')
+            counter = counter + 1
             # vm_updated = virtual_machine(proxmox_json=px_vm_each, proxmox_session=proxmox_session, cluster=cluster)
             # virtualmachines_list.append(vm_updated)
 
