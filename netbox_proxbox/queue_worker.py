@@ -410,6 +410,67 @@ def set_vm(vm_info_task, cluster=None):
 
 
 @job(QUEUE_NAME)
+def clean_cluster(cluster_task_id):
+    print("\n\n***>Processing clean_cluster<***")
+    cluster_task = SyncTask.objects.get(id=cluster_task_id)
+    job_task = SyncTask.objects.get(id=cluster_task.parent_id)
+    job_children = SyncTask.objects.filter(parent_id=job_task.id, done=False).count()
+    if job_children > 0:
+        current_queue_args = [
+            cluster_task_id
+        ]
+        cluster_data = delay_sync(cluster_task, clean_node, current_queue_args, 5)
+    else:
+        if not job_children.done:
+            job_children.done = True
+            job_children.status = TaskStatusChoices.STATUS_SUCCEEDED
+            job_children.save()
+
+        sync_task = get_or_create_sync_job(None, job_task.user, job_task.remove_unused)
+        current_queue_args = [
+            sync_task.task_id, job_task.user, job_task.remove_unused
+        ]
+        delay_sync(sync_task, start_sync, current_queue_args, 60)
+
+
+@job(QUEUE_NAME)
+def clean_node(node_task_id):
+    print("\n\n***>Processing finish_vm_process<***")
+    node_task = SyncTask.objects.get(id=node_task_id)
+    cluster_task = SyncTask.objects.get(id=node_task.parent_id)
+    cluster_children = SyncTask.objects.filter(parent_id=cluster_task.id, done=False).count()
+    if cluster_children > 0:
+        current_queue_args = [
+            node_task_id
+        ]
+        cluster_data = delay_sync(node_task, clean_node, current_queue_args, 1)
+    else:
+        if not node_task.done:
+            node_task.done = True
+            node_task.status = TaskStatusChoices.STATUS_SUCCEEDED
+            node_task.save()
+        current_queue_args = [
+            cluster_task.id
+        ]
+        queue_next_sync(cluster_task, clean_cluster, current_queue_args, 'clean_cluster')
+
+
+@job(QUEUE_NAME)
+def finish_vm_process(vm_info_task_id):
+    print("\n\n***>Processing finish_vm_process<***")
+    vm_info_task = get_process_vm(vm_info_task_id)
+    vm_info_task.status = TaskStatusChoices.STATUS_SUCCEEDED
+    vm_info_task.done = True
+    vm_info_task.save()
+    node_task_id = SyncTask.objects.get(id=vm_info_task.parent_id)
+    current_queue_args = [
+        vm_info_task.parent_id
+    ]
+    print("FINISH finish_vm_process")
+    cluster_data = delay_sync(node_task_id, clean_node, current_queue_args, 5)
+
+
+@job(QUEUE_NAME)
 def update_vm_process(vm_info_task_id, cluster=None, netbox_vm=None, step='finish'):
     try:
         print("\n\n***>Processing update_vm_process<***")
@@ -452,7 +513,7 @@ def update_vm_process(vm_info_task_id, cluster=None, netbox_vm=None, step='finis
                 print(tag_updated)
             except Exception as e:
                 print(e)
-                raise e
+                # raise e
             next_step = 'add_ip'
         elif step == 'add_ip':
             print("===>Update ips")
