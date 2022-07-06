@@ -21,6 +21,8 @@ class TaskTypeChoices(ChoiceSet):
     CLEAN_CLUSTER_SYNC = "clean_cluster_sync"
     CLEAN_SYNC = "clean_sync"
     FINISH_SYNC = "finish_sync"
+    REMOVE_UNUSED = "remove_unused"
+    REMOVE_UNUSED_STEP2 = "remove_unused_step2"
 
     CHOICES = (
         (UNDEFINED, "undefined"),
@@ -42,6 +44,8 @@ class TaskTypeChoices(ChoiceSet):
         (CLEAN_CLUSTER_SYNC, "clean_cluster_sync"),
         (CLEAN_SYNC, "clean_sync"),
         (FINISH_SYNC, "finish_sync"),
+        (REMOVE_UNUSED, "remove_unused"),
+        (REMOVE_UNUSED_STEP2, "remove_unused_step2")
     )
 
 
@@ -62,4 +66,16 @@ class TaskStatusChoices(ChoiceSet):
         (STATUS_SUCCEEDED, "succeeded"),
         (STATUS_SKIPPED, "skipped"),
         (STATUS_PAUSE, "pause"),
+    )
+
+
+class RemoveStatusChoices(ChoiceSet):
+    NOT_STARTED = "not_started"
+    REMOVING = "removing"
+    FINISH = "finish"
+
+    CHOICES = (
+        (NOT_STARTED, "not_started"),
+        (REMOVING, "removing"),
+        (FINISH, "finish")
     )

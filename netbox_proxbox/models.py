@@ -15,7 +15,7 @@ from extras.models.models import ChangeLoggedModel
 # from ipam.fields import IPAddressField
 
 # Class defined by Netbox to define (choice) the VM operational status
-from netbox_proxbox.choices import TaskTypeChoices, TaskStatusChoices
+from netbox_proxbox.choices import TaskTypeChoices, TaskStatusChoices, RemoveStatusChoices
 from netbox_proxbox.mixin.ModelDiffMixin import ModelDiffMixin
 from virtualization.models import VirtualMachineStatusChoices
 
@@ -100,7 +100,6 @@ class ProxmoxVM(ChangeLoggedModel):
 
 
 class SyncTask(ModelDiffMixin, ChangeLoggedModel):
-
     task_id = models.UUIDField(default=uuid.uuid4, editable=False, unique=True)
     name = models.CharField(max_length=255, blank=True, null=True)
     job_id = models.CharField(max_length=255, blank=True, null=True)
@@ -150,6 +149,8 @@ class SyncTask(ModelDiffMixin, ChangeLoggedModel):
     )
     progress = models.PositiveIntegerField(blank=True, null=True)
     progress_status = models.CharField(max_length=255, blank=True, null=True)
+    finish_remove_unused = models.CharField(max_length=255, choices=RemoveStatusChoices,
+                                            default=RemoveStatusChoices.NOT_STARTED)
     # Retrieve and filter 'ProxmoxVM' records
     objects = RestrictedQuerySet.as_manager()
 
