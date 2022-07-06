@@ -463,6 +463,7 @@ def remove_unused_step1(id):
         remove_task_step2.done = False
         remove_task_step2.parent_id = remove_task.id
         remove_task_step2.cluster_id = remove_task.cluster_id
+        remove_task_step2.name = "Remove vms for cluster step 1: " + str(remove_task_step2.cluster_id)
         remove_task_step2.save()
 
         current_queue_args = [
@@ -488,6 +489,7 @@ def clean_left(id):
                 remove_task.done = False
                 remove_task.parent_id = children_task.id
                 remove_task.cluster_id = children_task.cluster_id
+                remove_task.name = "Remove vms for cluster step 1: " + str(children_task.cluster_id)
                 remove_task.save()
                 children_task.done = False
                 children_task.finish_remove_unused = RemoveStatusChoices.REMOVING
@@ -751,10 +753,10 @@ def get_vms_for_the_node(node_task_id, task_id, iteration=0):
         cluster = create.virtualization.cluster(proxmox)
         vm_task.data_instance = node_vms_all
         vm_task.save()
-        counter = 0
+        # counter = 0
         for px_vm_each in node_vms_all:
-            if counter > 5:
-                break
+            # if counter > 5:
+            #     break
             print(px_vm_each)
             process_vm_info_args = [
                 vm_task.task_id, px_vm_each, cluster, None
@@ -763,7 +765,7 @@ def get_vms_for_the_node(node_task_id, task_id, iteration=0):
             print(f'34. Run the next function (process_vm_info for {domain}) ')
             print(process_vm_info_args)
             queue_next_sync(vm_task, process_vm_info, process_vm_info_args, 'process_vm_info')
-            counter = counter + 1
+            # counter = counter + 1
             # vm_updated = virtual_machine(proxmox_json=px_vm_each, proxmox_session=proxmox_session, cluster=cluster)
             # virtualmachines_list.append(vm_updated)
 
