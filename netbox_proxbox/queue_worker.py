@@ -483,6 +483,7 @@ def clean_left(id):
     if children_task.task_type == TaskTypeChoices.GET_CLUSTER_DATA:
         if children_task.remove_unused:
             if children_task.finish_remove_unused == RemoveStatusChoices.NOT_STARTED:
+                print("***>The cluster process is being Started<***")
                 remove_task = get_or_create_sync_job(None, children_task.user, children_task.remove_unused,
                                                      TaskTypeChoices.REMOVE_UNUSED)
                 remove_task.domain = children_task.domain
@@ -501,6 +502,7 @@ def clean_left(id):
                 queue_next_sync(children_task, remove_unused_step1, current_queue_args, 'remove_unused_step1', None)
                 return
             if children_task.finish_remove_unused == RemoveStatusChoices.REMOVING:
+                print("***>The cluster process is being remove<***")
                 return
     if children_task.parent_id is None:
         if not children_task.done:
@@ -522,7 +524,7 @@ def clean_left(id):
         ]
         cluster_data = delay_sync(children_task, clean_left, current_queue_args, 1)
     else:
-        print(f'49. No cluster left to process')
+        print(f'49. No item left to process')
         if not father_task.done and father_task.parent_id is not None:
             father_task.done = True
             father_task.status = TaskStatusChoices.STATUS_SUCCEEDED
@@ -574,14 +576,20 @@ def update_vm_process(vm_info_task_id, cluster=None, netbox_vm=None, step='finis
             next_step = 'custom_fields'
         elif step == 'custom_fields':
             # Update 'local_context_data' json, if necessary.
+            print("===>Update 'custom_fields' field, if necessary.")
+            custom_fields_updated = updates.virtual_machine.custom_fields(netbox_vm, proxmox_json)
+            print(custom_fields_updated)
+            next_step = 'local_context'
+        elif step == 'local_context':
+            # Update 'local_context_data' json, if necessary.
             print("===>Update 'local_context_data' json, if necessary.")
             PROXMOX = proxmox_session.get('PROXMOX')
             PROXMOX_PORT = proxmox_session.get('PROXMOX_PORT')
             local_context_updated = updates.virtual_machine.local_context_data(netbox_vm, proxmox_json, PROXMOX,
                                                                                PROXMOX_PORT)
             print(local_context_updated)
-            next_step = 'local_context'
-        elif step == 'local_context':
+            next_step = 'resources'
+        elif step == 'resources':
             # Update 'resources', like CPU, Memory and Disk, if necessary.
             print("===>Update 'resources', like CPU, Memory and Disk, if necessary.")
             resources_updated = updates.virtual_machine.resources(netbox_vm, proxmox_json)
