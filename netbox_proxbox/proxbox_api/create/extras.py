@@ -3,37 +3,40 @@ from ..plugins_config import (
     NETBOX_SESSION as nb,
 )
 
-#
-# extras.tags
-# 
-def tag():
-    proxbox_tag_name = 'Proxbox'
-    proxbox_tag_slug = 'proxbox'
 
+def custom_tag(tag_name, tag_slug, tag_description="No description"):
     # Check if Proxbox tag already exists.
     proxbox_tag = nb.extras.tags.get(
-        name = proxbox_tag_name,
-        slug = proxbox_tag_slug
+        name=tag_name,
+        slug=tag_slug
     )
 
     if proxbox_tag == None:
         try:
             # If Proxbox tag does not exist, create one.
             tag = nb.extras.tags.create(
-                name = proxbox_tag_name,
-                slug = proxbox_tag_slug,
-                color = 'ff5722',
-                description = "Proxbox Identifier (used to identify the items the plugin created)"
+                name=tag_name,
+                slug=tag_slug,
+                color='ff5722',
+                description=tag_description
             )
         except:
-            return "Error creating the '{0}' tag. Possible errors: the name '{0}' or slug '{1}' is already used.".format(proxbox_tag_name, proxbox_tag_slug)
+            return "Error creating the '{0}' tag. Possible errors: the name '{0}' or slug '{1}' is already used.".format(
+                tag_name, tag_slug)
     else:
         tag = proxbox_tag
 
     return tag
 
 
-
+#
+# extras.tags
+# 
+def tag():
+    proxbox_tag_name = 'Proxbox'
+    proxbox_tag_slug = 'proxbox'
+    description = "Proxbox Identifier (used to identify the items the plugin created)"
+    return custom_tag(proxbox_tag_name, proxbox_tag_slug, description)
 
 
 #
@@ -49,8 +52,8 @@ def role(**kwargs):
 
     # If user configured ROLE_ID in Netbox's PLUGINS_CONFIG, use it.
     if role_id > 0:
-        role = nb.dcim.device_roles.get(id = role_id)
-        
+        role = nb.dcim.device_roles.get(id=role_id)
+
         if role == None:
             return "Role ID of Virtual Machine or Node invalid. Maybe the ID passed does not exist or it is not a integer!"
 
@@ -60,8 +63,8 @@ def role(**kwargs):
 
         # Verify if basic role is already created
         role_proxbox = nb.dcim.device_roles.get(
-            name = role_proxbox_name,
-            slug = role_proxbox_slug
+            name=role_proxbox_name,
+            slug=role_proxbox_slug
         )
 
         # Create a basic Proxbox VM/Node Role if not created yet.
@@ -69,14 +72,15 @@ def role(**kwargs):
 
             try:
                 role = nb.dcim.device_roles.create(
-                    name = role_proxbox_name,
-                    slug = role_proxbox_slug,
-                    color = 'ff5722',
-                    vm_role = True
+                    name=role_proxbox_name,
+                    slug=role_proxbox_slug,
+                    color='ff5722',
+                    vm_role=True
                 )
             except:
-                return "Error creating the '{0}' role. Possible errors: the name '{0}' or slug '{1}' is already used.".format(role_proxbox_name, role_proxbox_slug)
-        
+                return "Error creating the '{0}' role. Possible errors: the name '{0}' or slug '{1}' is already used.".format(
+                    role_proxbox_name, role_proxbox_slug)
+
         # If basic role already created, use it.
         else:
             role = role_proxbox

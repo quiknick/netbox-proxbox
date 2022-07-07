@@ -605,6 +605,7 @@ def update_vm_process(vm_info_task_id, cluster=None, netbox_vm=None, step='finis
                 print(e)
                 # raise e
             next_step = 'add_ip'
+
         elif step == 'add_ip':
             print("===>Update ips")
             ip_update = updates.virtual_machine.add_ip(proxmox, netbox_vm, proxmox_json)
@@ -766,6 +767,9 @@ def get_vms_for_the_node(node_task_id, task_id, iteration=0):
             # if counter > 5:
             #     break
             print(px_vm_each)
+            is_template = px_vm_each.get("template")
+            if is_template == 1:
+                continue
             process_vm_info_args = [
                 vm_task.task_id, px_vm_each, cluster, None
             ]
@@ -774,6 +778,8 @@ def get_vms_for_the_node(node_task_id, task_id, iteration=0):
             print(process_vm_info_args)
             queue_next_sync(vm_task, process_vm_info, process_vm_info_args, 'process_vm_info')
             # counter = counter + 1
+
+
             # vm_updated = virtual_machine(proxmox_json=px_vm_each, proxmox_session=proxmox_session, cluster=cluster)
             # virtualmachines_list.append(vm_updated)
 
