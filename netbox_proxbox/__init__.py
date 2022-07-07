@@ -12,6 +12,7 @@ class ProxboxConfig(PluginConfig):
     base_url = "proxbox"
     required_settings = []
     default_settings = {
+        'NETBOX_PROXBOX_LOG_FILE': './netbox-proxbox.log',
         'proxmox': [
             {
                 'domain': 'proxbox.example.com',  # May also be IP address
@@ -37,6 +38,9 @@ class ProxboxConfig(PluginConfig):
             }
         }
     }
+    queues = [
+        'netbox_proxbox'
+    ]
 
 
 config = ProxboxConfig
