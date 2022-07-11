@@ -4,6 +4,11 @@ from .. import (
 
 
 def tag(netbox_vm, other_tags=None):
+    s, netbox_vm = tag(netbox_vm, other_tags)
+    return s
+
+
+def base_tag(netbox_vm, other_tags=None):
     output = False
     # Get current tags
     tags = netbox_vm.tags
@@ -19,7 +24,6 @@ def tag(netbox_vm, other_tags=None):
         tags.append(create.extras.tag().id)
         # Save new tag to object
         sve_custom = True
-
 
     # custom edgeuno tags
 
@@ -67,4 +71,4 @@ def tag(netbox_vm, other_tags=None):
         else:
             output = False
 
-    return output
+    return output, netbox_vm

@@ -48,7 +48,7 @@ def vm_full_update(proxmox_session, netbox_vm, proxmox_vm):
     tag_updated = updates.extras.tag(netbox_vm)
     #
     print("===>Update ips")
-    ip_update = updates.virtual_machine.add_ip(proxmox, netbox_vm, proxmox_vm)
+    ip_update = updates.virtual_machine.add_configuration(proxmox, netbox_vm, proxmox_vm)
     # changes = [custom_fields_updated, status_updated, local_context_updated, resources_updated]
     changes = {
         "status": status_updated,

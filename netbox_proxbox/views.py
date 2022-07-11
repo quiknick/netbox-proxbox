@@ -43,6 +43,7 @@ class ProxmoxVMView(PermissionRequiredMixin, View):
             },
         )
 
+
 class ProxmoxVMListView(PermissionRequiredMixin, View):
     """View for listing all existing Virtual Machines."""
 
@@ -66,14 +67,14 @@ class ProxmoxVMListView(PermissionRequiredMixin, View):
         self.queryset = self.filterset(request.GET, self.queryset).qs
 
         # table class
-        
+
         table = ProxmoxVMTable(self.queryset)
 
         # RequestConfig is used to configure pagination of 25 object per page
         RequestConfig(request, paginate={"per_page": 25}).configure(table)
 
         return render(
-            request, "netbox_proxbox/proxmox_vm_list.html", 
+            request, "netbox_proxbox/proxmox_vm_list.html",
             {
                 "table": table,
                 "filter_form": self.filterset_form(request.GET),
@@ -81,7 +82,7 @@ class ProxmoxVMListView(PermissionRequiredMixin, View):
             }
         )
 
-  
+
 # 'CreateView' is provided by Django
 class ProxmoxVMCreateView(PermissionRequiredMixin, CreateView):
     """View for creating a new ProxmoxVM instance."""
@@ -90,6 +91,7 @@ class ProxmoxVMCreateView(PermissionRequiredMixin, CreateView):
 
     form_class = ProxmoxVMForm
     template_name = "netbox_proxbox/proxmox_vm_edit.html"
+
 
 class ProxmoxVMDeleteView(PermissionRequiredMixin, DeleteView):
     """View for deleting ProxmoxVM instance."""
@@ -103,6 +105,7 @@ class ProxmoxVMDeleteView(PermissionRequiredMixin, DeleteView):
 
     # template_name = points to the template that will be rendred when asked to confirm the deletion
     template_name = "netbox_proxbox/proxmox_vm_delete.html"
+
 
 class ProxmoxVMEditView(PermissionRequiredMixin, UpdateView):
     """View for editing a ProxmoxVM instance."""
