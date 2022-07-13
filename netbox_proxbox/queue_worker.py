@@ -547,7 +547,7 @@ def clean_left(id):
                 current_queue_args = [
                     sync_task.task_id, children_task.user, children_task.remove_unused
                 ]
-                delay_sync(sync_task, start_sync, current_queue_args, 60)
+                delay_sync(sync_task, start_sync, current_queue_args, 360)
             return
 
         father_task = SyncTask.objects.get(id=children_task.parent_id)
@@ -813,9 +813,9 @@ def get_vms_for_the_node(node_task_id, task_id, iteration=0):
         # counter = 0
         for px_vm_each in node_vms_all:
             # if counter > 5:
-            #     break
-            if not (px_vm_each['name'] == 'mongodb.cloudapps.test'):
-                continue
+            #    break
+            # if not (px_vm_each['name'] == 'mongodb.cloudapps.test'):
+            #     continue
             print(px_vm_each)
             is_template = px_vm_each.get("template")
             if is_template == 1:
