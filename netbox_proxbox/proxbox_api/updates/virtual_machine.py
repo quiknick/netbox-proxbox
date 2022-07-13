@@ -486,8 +486,9 @@ def get_set_interface(name, virtual_machine):
     return vm_interface
 
 
-def get_set_tenant_from_configuration(test_str):
+def client_tenant_parser(test_str):
     client = None
+    tenant_name = None
     client_regex = r"client(\s)?(:)?.*(id)?:"
     try:
         matches = re.finditer(client_regex, test_str, re.MULTILINE | re.IGNORECASE)
@@ -506,114 +507,103 @@ def get_set_tenant_from_configuration(test_str):
             .replace('(Id :', '') \
             .replace('(ID :', '') \
             .strip()
+        sub_str_regex = r"\(.*\)"
+        m_result = None
+        try:
+            m_result = re.finditer(sub_str_regex, client, re.MULTILINE | re.IGNORECASE).__next__().group().strip()
+        except Exception as e:
+            print(e)
+            pass
+        if m_result:
+            if m_result.replace('(', '').replace(')', '').strip():
+                tenant_name = m_result.replace('(', '').replace(')', '').strip()
+            client = client.replace(m_result, '').strip()
+        else:
+            tenant_name = client
         print('[OK] Tenant parse. -> {}'.format(client))
     except Exception as e:
         pass
-    nb_tenant = nb.tenancy.tenants.get(name=client)
+    return tenant_name, client
+
+
+def get_set_tenant_from_configuration(test_str):
+    tenant_name, client = client_tenant_parser(test_str)
+    nb_tenant = nb.tenancy.tenants.get(name=tenant_name)
     if nb_tenant is None:
-        new_tenant = {"name": client, "slug": slugify(client)}
+        new_tenant = {"name": tenant_name, "slug": slugify(tenant_name)}
         nb_tenant = nb.tenancy.tenants.create(new_tenant)
-    tenant = set_contact(test_str, nb_tenant)
-    return tenant
+    set_assign_contact(test_str, client, nb_tenant.id, 'tenancy.tenant')
+    return nb_tenant
+
+
+def contact_parse_set(test_str, name):
+    contact = None
+    contact_role = None
+    try:
+        print('[OK] Parsing contact from. -> {}'.format(test_str))
+        contact_email = None
+        contact_regex = r"email(\s)?(:)?(\s)?\w+([\.-]?\w+)*@\w+([\.-]?\w+)*(\.\w{2,3})+"
+        try:
+            matches = re.finditer(contact_regex, test_str, re.MULTILINE | re.IGNORECASE)
+            it = matches.__next__()
+            contact_email = it.group() \
+                .replace('email:', '') \
+                .replace('email :', '') \
+                .replace('Email:', '') \
+                .replace('Email :', '') \
+                .strip()
+            print('[OK] Contact email parsed. -> {}'.format(contact_email))
+        except Exception as e:
+            print(e)
+        if contact_email is None:
+            return None, None
+
+        contact = nb.tenancy.contacts.get(email=contact_email)
+        if contact is None:
+            print('[OK] Creating contact for {} with email {}'.format(name, contact_email))
+            new_contact = {"name": name, "email": contact_email}
+            contact = nb.tenancy.contacts.create(new_contact)
+
+        contact_role = nb.tenancy.contact_roles.get(name="vm")
+        if contact_role is None:
+            print('[OK] Creating role. -> {}'.format("vm"))
+            new_contact_role = {"name": "vm", "slug": slugify("vm")}
+            contact_role = nb.tenancy.contact_roles.create(new_contact_role)
+    except Exception as e:
+        print(e)
+
+    return contact, contact_role
 
 
 def set_contact_to_vm(test_str, netbox_vm):
+    content_type = 'virtualization.virtualmachine'
     try:
         print('[OK] Parsing contact from. -> {}'.format(test_str))
-        contact_email = None
         tenant = netbox_vm.tenant
-        contact_regex = r"email(\s)?(:)?(\s)?\w+([\.-]?\w+)*@\w+([\.-]?\w+)*(\.\w{2,3})+"
-        try:
-            matches = re.finditer(contact_regex, test_str, re.MULTILINE | re.IGNORECASE)
-            it = matches.__next__()
-            contact_email = it.group() \
-                .replace('email:', '') \
-                .replace('email :', '') \
-                .replace('Email:', '') \
-                .replace('Email :', '') \
-                .strip()
-            print('[OK] Contact email parsed. -> {}'.format(contact_email))
-        except Exception as e:
-            print(e)
-        if contact_email is None:
-            return netbox_vm
-
-        contact = nb.tenancy.contacts.get(email=contact_email)
-        if contact is None:
-            print('[OK] Creating contact for {} with email {}'.format(netbox_vm.name, contact_email))
-            new_contact = {"name": tenant.name, "email": contact_email}
-            contact = nb.tenancy.contacts.create(new_contact)
-
-        contact_role = nb.tenancy.contact_roles.get(name="vm")
-        if contact_role is None:
-            print('[OK] Creating role. -> {}'.format("vm"))
-            new_contact_role = {"name": "vm", "slug": slugify("vm")}
-            contact_role = nb.tenancy.contact_roles.create(new_contact_role)
-        content_type = 'virtualization.virtualmachine'
-        contact_assigment = nb.tenancy.contact_assignments.get(object_id=netbox_vm.id,
-                                                               content_type=content_type,
-                                                               contact_id=contact.id,
-                                                               role_id=contact_role.id)
-        if contact_assigment is None:
-            print('[OK] Assigning contact {} to virtual machine {}'.format(contact.name, tenant.name))
-
-            new_contact_assigment = {"object_id": netbox_vm.id,
-                                     "virtual_machine": netbox_vm.id,
-                                     "contact": contact.id,
-                                     "content_type": content_type,
-                                     "contact_id": contact.id,
-                                     "role": contact_role.id,
-                                     "priority": "primary"
-                                     }
-            contact_assigment = nb.tenancy.contact_assignments.create(new_contact_assigment)
-            print('[OK] Contact assigned {} to virtual machine {}'.format(contact.name, tenant.name))
-            # assign_contact_to_tenant(tenant, contact, contact_role, content_type)
+        tenant_name, client = client_tenant_parser(test_str)
+        set_assign_contact(test_str, client, netbox_vm.id, content_type)
         return netbox_vm
     except Exception as e:
         print(e)
         return netbox_vm
 
 
-def set_contact(test_str, tenant):
+def set_assign_contact(test_str, name, object_id, content_type='tenancy.tenant'):
+    contact = None
+    contact_role = None
+    contact_assigment = None
     try:
-        print('[OK] Parsing contact from. -> {}'.format(test_str))
-        contact_email = None
-        contact_regex = r"email(\s)?(:)?(\s)?\w+([\.-]?\w+)*@\w+([\.-]?\w+)*(\.\w{2,3})+"
-        try:
-            matches = re.finditer(contact_regex, test_str, re.MULTILINE | re.IGNORECASE)
-            it = matches.__next__()
-            contact_email = it.group() \
-                .replace('email:', '') \
-                .replace('email :', '') \
-                .replace('Email:', '') \
-                .replace('Email :', '') \
-                .strip()
-            print('[OK] Contact email parsed. -> {}'.format(contact_email))
-        except Exception as e:
-            print(e)
-        if contact_email is None:
-            return tenant
-
-        contact = nb.tenancy.contacts.get(email=contact_email)
-        if contact is None:
-            print('[OK] Creating contact for {} with email {}'.format(tenant.name, contact_email))
-            new_contact = {"name": tenant.name, "email": contact_email}
-            contact = nb.tenancy.contacts.create(new_contact)
-
-        contact_role = nb.tenancy.contact_roles.get(name="vm")
-        if contact_role is None:
-            print('[OK] Creating role. -> {}'.format("vm"))
-            new_contact_role = {"name": "vm", "slug": slugify("vm")}
-            contact_role = nb.tenancy.contact_roles.create(new_contact_role)
-        content_type = 'tenancy.tenant'
-        contact_assigment = nb.tenancy.contact_assignments.get(object_id=tenant.id,
+        contact, contact_role = contact_parse_set(test_str, name)
+        if not (contact and contact_role):
+            return contact, contact_role, contact_assigment
+        contact_assigment = nb.tenancy.contact_assignments.get(object_id=object_id,
                                                                contact_id=contact.id,
                                                                content_type=content_type,
                                                                role_id=contact_role.id)
         if contact_assigment is None:
-            print('[OK] Assigning contact {} to tenant {}'.format(contact.name, tenant.name))
+            print('[OK] Assigning contact {} to tenant {}'.format(contact.name, name))
 
-            new_contact_assigment = {"object_id": tenant.id, "tenant": tenant.id, "tenant_id": tenant.id,
+            new_contact_assigment = {"object_id": object_id,
                                      "contact": contact.id,
                                      "content_type": content_type,
                                      "contact_id": contact.id,
@@ -621,34 +611,52 @@ def set_contact(test_str, tenant):
                                      "priority": "primary"
                                      }
             contact_assigment = nb.tenancy.contact_assignments.create(new_contact_assigment)
-            print('[OK] Contact assigned {} to tenant {}'.format(contact.name, tenant.name))
+            print('[OK] Contact assigned {} to tenant {}'.format(contact.name, name))
             # assign_contact_to_tenant(tenant, contact, contact_role, content_type)
-        return tenant
     except Exception as e:
         print(e)
-        return tenant
+    return contact, contact_role, contact_assigment
 
 
-def assign_contact_to_tenant(tenant, contact, role, content_type):
-    custom_field_updated = http_contact_assing(
-        domain_with_http=NETBOX,
-        token=NETBOX_TOKEN,
-        tenant_id=tenant.id,
-        contact_id=contact.id,
-        role_id=role.id,
-        content_type=content_type.app_label + '.' + content_type.model
-    )
+#
+# def assign_contact_to_tenant(tenant, contact, role, content_type):
+#     custom_field_updated = http_contact_assing(
+#         domain_with_http=NETBOX,
+#         token=NETBOX_TOKEN,
+#         tenant_id=tenant.id,
+#         contact_id=contact.id,
+#         role_id=role.id,
+#         content_type=content_type.app_label + '.' + content_type.model
+#     )
+#
+#     # Verify HTTP reply CODE
+#     if custom_field_updated != 200:
+#         print(
+#             "[ERROR] Some error occured trying to update 'custom_fields' through HTTP Request. HTTP Code: {}.".format(
+#                 custom_field_updated))
+#         return False
+#
+#     else:
+#         # If none error occured, considers VM updated.
+#         return True
 
-    # Verify HTTP reply CODE
-    if custom_field_updated != 200:
-        print(
-            "[ERROR] Some error occured trying to update 'custom_fields' through HTTP Request. HTTP Code: {}.".format(
-                custom_field_updated))
-        return False
-
-    else:
-        # If none error occured, considers VM updated.
-        return True
+def get_set_tenant_group(tenant, netbox_vm):
+    tags = netbox_vm.tags
+    tags_name = []
+    tenant_group_name = 'Customers'
+    for tag in tags:
+        if not ('Proxbox' == tag):
+            tags_name.append(tag.name)
+    if 'EdgeUno' in tags_name:
+        tenant_group_name = 'EdgeUno'
+    tenant_group = nb.tenancy.tenant_groups.get(name=tenant_group_name)
+    if tenant_group is None:
+        new_tenant_group = {"name": tenant_group_name, "slug": slugify(tenant_group_name)}
+        tenant_group = nb.tenancy.contact_roles.create(new_tenant_group)
+    tenant.group_id = tenant_group.id
+    tenant.group = tenant_group
+    tenant.save()
+    return tenant
 
 
 def set_tenant(netbox_vm, observation):
@@ -656,12 +664,14 @@ def set_tenant(netbox_vm, observation):
     tenant = get_set_tenant_from_configuration(observation)
     if tenant is None:
         return netbox_vm
+    tenant = get_set_tenant_group(tenant, netbox_vm)
 
     netbox_vm.tenant_id = tenant.id
     netbox_vm.tenant = tenant
     if observation:
         netbox_vm.comments = observation
     netbox_vm.save()
+
     return netbox_vm
 
 
@@ -720,8 +730,8 @@ def base_add_ip(proxmox, netbox_vm, proxmox_vm):
                 # Create the interface if doesn't exists
                 try:
                     vm_interface = get_set_interface(name, virtual_machine)
-                    netbox_vm = set_ipv4(netbox_vm, vm_interface, ipv4)
                     netbox_vm = set_ipv6(netbox_vm, vm_interface, ipv6)
+                    netbox_vm = set_ipv4(netbox_vm, vm_interface, ipv4)
                 except Exception as e:
                     print(e)
                 netbox_vm.save()

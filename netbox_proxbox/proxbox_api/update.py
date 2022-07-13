@@ -67,10 +67,12 @@ def node_full_update(proxmox, netbox_node, proxmox_json, proxmox_cluster):
 
     status_updated = updates.node.status(netbox_node, proxmox_json)
     cluster_updated = updates.node.cluster(proxmox, netbox_node, proxmox_json, proxmox_cluster)
+    ip_updated = updates.node.interface_ip_assign(netbox_node, proxmox_json)
 
     changes = {
         "status": status_updated,
-        "cluster": cluster_updated
+        "cluster": cluster_updated,
+        "ip": ip_updated
     }
 
     return changes
@@ -356,22 +358,35 @@ def virtual_machine(**kwargs):
     return json_vm
 
 
+def find_node_by_ip(ip):
+    current_ip = nb.ipam.ip_addresses.get(address=ip)
+    if current_ip and current_ip.assigned_object and current_ip.assigned_object.device:
+        device = current_ip.assigned_object.device
+        return device
+
+
 def nodes(**kwargs):
     proxmox_cluster = kwargs.get('proxmox_cluster')
     proxmox_json = kwargs.get('proxmox_json')
     proxmox = kwargs.get('proxmox')
+    proxmox_session = kwargs.get('proxmox_session', None)
+
+    node_ip = proxmox_json.get("ip", None)
 
     proxmox_node_name = proxmox_json.get("name")
 
     json_node = {}
 
     # Search netbox using VM name
-    netbox_search = nb.dcim.devices.get(name=proxmox_node_name)
+    if node_ip:
+        netbox_search = find_node_by_ip(node_ip)
+    if netbox_search is None:
+        netbox_search = nb.dcim.devices.get(name=proxmox_node_name)
 
     # Search node on Netbox with Proxmox node name gotten
-    if nb.dcim.devices.get(name=proxmox_node_name) == None:
+    if netbox_search == None:
         # If node does not exist, create it.
-        netbox_node = create.dcim.node(proxmox, proxmox_json)
+        netbox_node = create.dcim.node(proxmox, proxmox_json, proxmox_session)
 
         # Node created
         if netbox_node != None:

@@ -616,6 +616,16 @@ def update_vm_process(vm_info_task_id, cluster=None, netbox_vm=None, step='finis
             print("===>Update 'status' field, if necessary.")
             status_updated, netbox_vm = updates.virtual_machine.base_status(netbox_vm, proxmox_json)
             print(status_updated)
+            next_step = 'tags'
+        elif step == 'tags':
+            print("===>Update tags")
+            print(netbox_vm)
+            try:
+                tag_updated, netbox_vm = updates.extras.base_tag(netbox_vm)
+                print(tag_updated)
+            except Exception as e:
+                print(e)
+                # raise e
             next_step = 'custom_fields'
         elif step == 'custom_fields':
             # Update 'local_context_data' json, if necessary.
@@ -639,18 +649,7 @@ def update_vm_process(vm_info_task_id, cluster=None, netbox_vm=None, step='finis
             print("===>Update 'resources', like CPU, Memory and Disk, if necessary.")
             resources_updated, netbox_vm = updates.virtual_machine.base_resources(netbox_vm, proxmox_json)
             print(resources_updated)
-            next_step = 'tags'
-        elif step == 'tags':
-            print("===>Update tags")
-            print(netbox_vm)
-            try:
-                tag_updated, netbox_vm = updates.extras.base_tag(netbox_vm)
-                print(tag_updated)
-            except Exception as e:
-                print(e)
-                # raise e
             next_step = 'add_ip'
-
         elif step == 'add_ip':
             print("===>Update ips")
             ip_update, netbox_vm = updates.virtual_machine.base_add_ip(proxmox, netbox_vm, proxmox_json)
@@ -815,8 +814,8 @@ def get_vms_for_the_node(node_task_id, task_id, iteration=0):
         for px_vm_each in node_vms_all:
             # if counter > 5:
             #     break
-            # if not (px_vm_each['name'] == 'mongodb.cloudapps.test'):
-            #     continue
+            if not (px_vm_each['name'] == 'mongodb.cloudapps.test'):
+                continue
             print(px_vm_each)
             is_template = px_vm_each.get("template")
             if is_template == 1:
@@ -906,7 +905,8 @@ def get_nodes_for_the_cluster(cluster_data_id, task_id, iteration=0):
 
         for px_node_each in proxmox_nodes:
             try:
-                node_updated = nodes(proxmox_json=px_node_each, proxmox_cluster=proxmox_cluster, proxmox=proxmox)
+                node_updated = nodes(proxmox_json=px_node_each, proxmox_cluster=proxmox_cluster, proxmox=proxmox,
+                                     proxmox_session=proxmox_session)
                 node_response_list.append(px_node_each)
                 print(px_node_each)
             except Exception as e:
