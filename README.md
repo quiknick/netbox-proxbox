@@ -306,13 +306,15 @@ Optional values (may be different)
 If everything is working correctly, you should see in Netbox's navigation the **Proxmox VM/CT** button in **Plugins**
 dropdown list.
 
-On **Proxmox VM/CT** page, click button ![full update button](etc/img/proxbox_full_update_button.png?raw=true "preview")
+~~On **Proxmox VM/CT** page, click button ![full update button](etc/img/proxbox_full_update_button.png?raw=true "preview")~~
 
-It will redirect you to a new page and you just have to wait until the plugin runs through all Proxmox Cluster and
-create the VMs and CTs in Netbox.
+~~It will redirect you to a new page and you just have to wait until the plugin runs through all Proxmox Cluster and
+create the VMs and CTs in Netbox.~~
 
 **OBS:** ~~Due the time it takes to full update the information, your web browser might show a timeout page (like HTTP
-Code 504) even though it actually worked.~~ In order to
+Code 504) even though it actually worked.~~ 
+
+In order to
 start the process a call to [http://{my.netbox.instance}/plugins/proxbox/queue/]() is needed. In future versions there
 will be more control over
 the process (a django queue is needed).
