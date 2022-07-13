@@ -12,7 +12,7 @@ with open("README.md", "r") as fh:
     long_description = fh.read()
 '''
 
-github = 'https://github.com/N-Multifibra/netbox-proxbox'
+github = 'https://github.com/edgeuno/netbox-proxbox'
 
 # Proxbox dependencies
 requires = [
@@ -38,11 +38,11 @@ dev_requires = [
 
 setup(
     name="netbox-proxbox",
-    version="0.0.3.dev3",
-    author="Emerson Felipe",
-    author_email="emerson.felipe@nmultifibra.com.br",
+    version="0.0.4.beta-1",
+    author="Javier Alejandro Ruiz",  # Original Autor Emerson Felipe
+    author_email="javier.ruiz@edgeuno.com",  # Original Autor Email emerson.felipe@nmultifibra.com.br
     description="Integration between Proxmox and Netbox",
-    url='https://github.com/N-Multifibra/netbox-proxbox',
+    url='https://github.com/edgeuno/netbox-proxbox',  # Original url https://github.com/N-Multifibra/netbox-proxbox
     long_description=long_description,
     long_description_content_type="text/markdown",
     classifiers=[
@@ -51,7 +51,7 @@ setup(
         "Operating System :: Unix",
         "License :: OSI Approved :: Apache Software License",
     ],
-    keywords="netbox netbox-plugin plugin proxmox proxmoxer pynetbox",
+    keywords="netbox netbox-plugin plugin proxmox proxmoxer pynetbox edgeuno",
     project_urls={
         'Source': github,
     },

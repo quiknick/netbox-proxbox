@@ -547,7 +547,7 @@ def clean_left(id):
                 current_queue_args = [
                     sync_task.task_id, children_task.user, children_task.remove_unused
                 ]
-                delay_sync(sync_task, start_sync, current_queue_args, 60)
+                delay_sync(sync_task, start_sync, current_queue_args, 360)
             return
 
         father_task = SyncTask.objects.get(id=children_task.parent_id)
