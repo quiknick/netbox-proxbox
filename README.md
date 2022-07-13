@@ -180,7 +180,7 @@ PLUGINS_CONFIG = {
 Restart the WSGI service to load the new plugin:
 
 ```
-# sudo systemctl restart netbox
+# sudo systemctl restart netbox netbox-rq
 ```
 
 ### 1.6. Queue Initialization
