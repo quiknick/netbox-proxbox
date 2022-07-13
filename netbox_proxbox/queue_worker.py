@@ -372,170 +372,213 @@ def remove_unused_step2(id, nb_vm_each):
     remove_task_step2 = SyncTask.objects.get(id=id)
     domain = remove_task_step2.domain
     proxmox_session = get_session(domain)
+    try:
+        json_vm = {}
+        log = []
 
-    json_vm = {}
-    log = []
+        netbox_obj = nb_vm_each
+        netbox_name = netbox_obj.name
+        json_vm["name"] = netbox_name
 
-    netbox_obj = nb_vm_each
-    netbox_name = netbox_obj.name
-    json_vm["name"] = netbox_name
+        # Verify if VM exists on Proxmox
+        vm_on_proxmox = is_vm_on_proxmox(proxmox_session, nb_vm_each)
 
-    # Verify if VM exists on Proxmox
-    vm_on_proxmox = is_vm_on_proxmox(proxmox_session, nb_vm_each)
-
-    if vm_on_proxmox == True:
-        log_message = '[OK] VM exists on both systems (Netbox and Proxmox) -> {}'.format(netbox_name)
-        print(log_message)
-        log.append(log_message)
-
-        json_vm["result"] = False
-
-    # If VM does not exist on Proxmox, delete VM on Netbox.
-    elif vm_on_proxmox == False:
-        log_message = "[WARNING] VM exists on Netbox, but not on Proxmox. Delete it!  -> {}".format(netbox_name)
-        print(log_message)
-        log.append(log_message)
-
-        # Only delete VM that has proxbox tag registered
-        delete_vm = False
-
-        if len(netbox_obj.tags) > 0:
-            for tag in netbox_obj.tags:
-
-                if tag.name == 'Proxbox' and tag.slug == 'proxbox':
-
-                    #
-                    # DELETE THE VM/CT
-                    #
-                    delete_vm = netbox_obj.delete()
-
-                else:
-                    log_message = "[ERROR] VM will not be removed because the 'Proxbox' tag was not found. -> {}".format(
-                        netbox_name)
-                    print(log_message)
-                    log.append(log_message)
-
-        elif len(netbox_obj.tags) == 0:
-            log_message = "[ERROR] VM will not be removed because the 'Proxbox' tag was not found. There is no tag configured.-> {}".format(
-                netbox_name)
+        if vm_on_proxmox == True:
+            log_message = '[OK] VM exists on both systems (Netbox and Proxmox) -> {}'.format(netbox_name)
             print(log_message)
             log.append(log_message)
 
-        if delete_vm == True:
-            log_message = "[OK] VM successfully removed from Netbox."
+            json_vm["result"] = False
+
+        # If VM does not exist on Proxmox, delete VM on Netbox.
+        elif vm_on_proxmox == False:
+            log_message = "[WARNING] VM exists on Netbox, but not on Proxmox. Delete it!  -> {}".format(netbox_name)
             print(log_message)
             log.append(log_message)
 
-            json_vm["result"] = True
+            # Only delete VM that has proxbox tag registered
+            delete_vm = False
 
-    else:
-        log_message = '[ERROR] Unexpected error trying to verify if VM exist on Proxmox'
-        print(log_message)
-        log.append(log_message)
+            if len(netbox_obj.tags) > 0:
+                for tag in netbox_obj.tags:
 
-        json_vm["result"] = False
+                    if tag.name == 'Proxbox' and tag.slug == 'proxbox':
 
-    json_vm["log"] = log
+                        #
+                        # DELETE THE VM/CT
+                        #
+                        delete_vm = netbox_obj.delete()
 
-    remove_task_step2.done = True
-    remove_task_step2.save()
+                    else:
+                        log_message = "[ERROR] VM will not be removed because the 'Proxbox' tag was not found. -> {}".format(
+                            netbox_name)
+                        print(log_message)
+                        log.append(log_message)
 
-    current_queue_args = [
-        remove_task_step2.id
-    ]
-    queue_next_sync(remove_task_step2, clean_left, current_queue_args, 'clean_left', TaskStatusChoices.STATUS_SUCCEEDED)
+            elif len(netbox_obj.tags) == 0:
+                log_message = "[ERROR] VM will not be removed because the 'Proxbox' tag was not found. There is no tag configured.-> {}".format(
+                    netbox_name)
+                print(log_message)
+                log.append(log_message)
 
-    return json_vm
-    # json_vm_all.append(json_vm)
+            if delete_vm == True:
+                log_message = "[OK] VM successfully removed from Netbox."
+                print(log_message)
+                log.append(log_message)
+
+                json_vm["result"] = True
+
+        else:
+            log_message = '[ERROR] Unexpected error trying to verify if VM exist on Proxmox'
+            print(log_message)
+            log.append(log_message)
+
+            json_vm["result"] = False
+
+        json_vm["log"] = log
+
+        remove_task_step2.done = True
+        remove_task_step2.save()
+
+        current_queue_args = [
+            remove_task_step2.id
+        ]
+        queue_next_sync(remove_task_step2, clean_left, current_queue_args, 'clean_left',
+                        TaskStatusChoices.STATUS_SUCCEEDED)
+
+        return json_vm
+        # json_vm_all.append(json_vm)
+    except Exception as e:
+        print(e)
+        remove_task_step2.done = True
+        remove_task_step2.status = TaskStatusChoices.STATUS_FAILED
+        remove_task_step2.fail_reason = e
+        remove_task_step2.message = e
+        remove_task_step2.save()
 
 
 @job(QUEUE_NAME)
 def remove_unused_step1(id):
     remove_task = SyncTask.objects.get(id=id)
-    json_vm_all = []
+    try:
+        json_vm_all = []
 
-    # Get all VM/CTs from Netbox
-    netbox_all_vms = nb.virtualization.virtual_machines.filter(cluster_id=remove_task.cluster_id)
-    for nb_vm_each in netbox_all_vms:
-        remove_task_step2 = get_or_create_sync_job(None, remove_task.user, remove_task.remove_unused,
-                                                   TaskTypeChoices.REMOVE_UNUSED_STEP2)
-        remove_task_step2.domain = remove_task.domain
-        remove_task_step2.done = False
-        remove_task_step2.parent_id = remove_task.id
-        remove_task_step2.cluster_id = remove_task.cluster_id
-        remove_task_step2.name = "Remove vms for cluster step 1: " + str(remove_task_step2.cluster_id)
-        remove_task_step2.save()
+        # Get all VM/CTs from Netbox
+        netbox_all_vms = nb.virtualization.virtual_machines.filter(cluster_id=remove_task.cluster_id)
+        for nb_vm_each in netbox_all_vms:
+            remove_task_step2 = get_or_create_sync_job(None, remove_task.user, remove_task.remove_unused,
+                                                       TaskTypeChoices.REMOVE_UNUSED_STEP2)
+            remove_task_step2.domain = remove_task.domain
+            remove_task_step2.done = False
+            remove_task_step2.parent_id = remove_task.id
+            remove_task_step2.cluster_id = remove_task.cluster_id
+            remove_task_step2.name = "Remove vms for cluster step 1: " + str(remove_task_step2.cluster_id)
+            remove_task_step2.save()
 
-        current_queue_args = [
-            remove_task_step2.id,
-            nb_vm_each
-        ]
-        queue_next_sync(remove_task, remove_unused_step2, current_queue_args, 'remove_unused_step2',
-                        TaskStatusChoices.STATUS_RUNNING)
+            current_queue_args = [
+                remove_task_step2.id,
+                nb_vm_each
+            ]
+            queue_next_sync(remove_task, remove_unused_step2, current_queue_args, 'remove_unused_step2',
+                            TaskStatusChoices.STATUS_RUNNING)
 
-    return json_vm_all
+        return json_vm_all
+    except Exception as e:
+        print(e)
+        remove_task.done = True
+        remove_task.status = TaskStatusChoices.STATUS_FAILED
+        remove_task.fail_reason = e
+        remove_task.message = e
+        remove_task.save()
 
 
 @job(QUEUE_NAME)
 def clean_left(id):
     print("\n\n***>Processing clean_left<***")
     children_task = SyncTask.objects.get(id=id)
-    if children_task.task_type == TaskTypeChoices.GET_CLUSTER_DATA:
-        if children_task.remove_unused:
-            if children_task.finish_remove_unused == RemoveStatusChoices.NOT_STARTED:
-                print("***>The cluster process is being Started<***")
-                remove_task = get_or_create_sync_job(None, children_task.user, children_task.remove_unused,
-                                                     TaskTypeChoices.REMOVE_UNUSED)
-                remove_task.domain = children_task.domain
-                remove_task.done = False
-                remove_task.parent_id = children_task.id
-                remove_task.cluster_id = children_task.cluster_id
-                remove_task.name = "Remove vms for cluster step 1: " + str(children_task.cluster_id)
-                remove_task.save()
-                children_task.done = False
-                children_task.finish_remove_unused = RemoveStatusChoices.REMOVING
+    try:
+        if children_task.task_type == TaskTypeChoices.GET_CLUSTER_DATA:
+            if children_task.remove_unused:
+                if children_task.finish_remove_unused == RemoveStatusChoices.NOT_STARTED:
+                    print("***>The cluster process is being Started<***")
+                    remove_task = get_or_create_sync_job(None, children_task.user, children_task.remove_unused,
+                                                         TaskTypeChoices.REMOVE_UNUSED)
+                    remove_task.domain = children_task.domain
+                    remove_task.done = False
+                    remove_task.parent_id = children_task.id
+                    remove_task.cluster_id = children_task.cluster_id
+                    remove_task.name = "Remove vms for cluster step 1: " + str(children_task.cluster_id)
+                    remove_task.save()
+                    children_task.done = False
+                    children_task.finish_remove_unused = RemoveStatusChoices.REMOVING
+                    children_task.save()
+                    current_queue_args = [
+                        remove_task.id
+                    ]
+
+                    queue_next_sync(children_task, remove_unused_step1, current_queue_args, 'remove_unused_step1', None)
+                    current_queue_args = [
+                        id
+                    ]
+                    delay_sync(children_task, clean_left, current_queue_args, 1)
+                    return
+                if children_task.finish_remove_unused == RemoveStatusChoices.REMOVING:
+                    print("***>The cluster process is being remove<***")
+                    current_queue_args = [
+                        id
+                    ]
+                    cluster_data = delay_sync(children_task, clean_left, current_queue_args, 1)
+                    return
+
+        # if children_task.done and children_task.parent_id is not None:
+        #     current_queue_args = [
+        #         children_task.parent_id
+        #     ]
+        #     queue_next_sync(children_task, clean_left, current_queue_args, 'clean_left',
+        #                     TaskStatusChoices.STATUS_SUCCEEDED)
+        #     return
+
+        if children_task.parent_id is None:
+            if not children_task.done:
+                children_task.done = True
+                children_task.status = TaskStatusChoices.STATUS_SUCCEEDED
                 children_task.save()
+                sync_task = get_or_create_sync_job(None, children_task.user, children_task.remove_unused)
                 current_queue_args = [
-                    remove_task.id
+                    sync_task.task_id, children_task.user, children_task.remove_unused
                 ]
+                delay_sync(sync_task, start_sync, current_queue_args, 60)
+            return
 
-                queue_next_sync(children_task, remove_unused_step1, current_queue_args, 'remove_unused_step1', None)
-                return
-            if children_task.finish_remove_unused == RemoveStatusChoices.REMOVING:
-                print("***>The cluster process is being remove<***")
-                return
-    if children_task.parent_id is None:
-        if not children_task.done:
-            children_task.done = True
-            children_task.status = TaskStatusChoices.STATUS_SUCCEEDED
-            children_task.save()
-            sync_task = get_or_create_sync_job(None, children_task.user, children_task.remove_unused)
+        father_task = SyncTask.objects.get(id=children_task.parent_id)
+        all_children_count = SyncTask.objects.filter(parent_id=father_task.id, done=False).count()
+        if all_children_count > 0:
+            print(f'48. All clusters have not being finish')
             current_queue_args = [
-                sync_task.task_id, children_task.user, children_task.remove_unused
+                id
             ]
-            delay_sync(sync_task, start_sync, current_queue_args, 60)
-        return
-    father_task = SyncTask.objects.get(id=children_task.parent_id)
-    all_children_count = SyncTask.objects.filter(parent_id=father_task.id, done=False).count()
-    if all_children_count > 0:
-        print(f'48. All clusters have not being finish')
-        current_queue_args = [
-            id
-        ]
-        cluster_data = delay_sync(children_task, clean_left, current_queue_args, 1)
-    else:
-        print(f'49. No item left to process')
-        if not father_task.done and father_task.parent_id is not None:
-            father_task.done = True
-            father_task.status = TaskStatusChoices.STATUS_SUCCEEDED
-            if father_task.finish_remove_unused == RemoveStatusChoices.REMOVING:
-                father_task.finish_remove_unused = RemoveStatusChoices.FINISH
-            father_task.save()
+            cluster_data = delay_sync(children_task, clean_left, current_queue_args, 1)
+        else:
+            print(f'49. No item left to process')
+            if not father_task.done and father_task.parent_id is not None:
+                father_task.done = True
+                father_task.status = TaskStatusChoices.STATUS_SUCCEEDED
+                if father_task.finish_remove_unused == RemoveStatusChoices.REMOVING:
+                    father_task.finish_remove_unused = RemoveStatusChoices.FINISH
+                father_task.save()
 
-        current_queue_args = [
-            father_task.id
-        ]
-        queue_next_sync(children_task, clean_left, current_queue_args, 'clean_left', TaskStatusChoices.STATUS_SUCCEEDED)
+            current_queue_args = [
+                father_task.id
+            ]
+            queue_next_sync(children_task, clean_left, current_queue_args, 'clean_left',
+                            TaskStatusChoices.STATUS_SUCCEEDED)
+    except Exception as e:
+        print(e)
+        children_task.done = True
+        children_task.status = TaskStatusChoices.STATUS_FAILED
+        children_task.message = e
+        children_task.fail_reason = e
+        children_task.save()
 
 
 @job(QUEUE_NAME)
@@ -571,13 +614,24 @@ def update_vm_process(vm_info_task_id, cluster=None, netbox_vm=None, step='finis
         print(f'***>SELECTING OPTION FOR: {step}<***')
         if step == 'status':
             print("===>Update 'status' field, if necessary.")
-            status_updated = updates.virtual_machine.status(netbox_vm, proxmox_json)
+            status_updated, netbox_vm = updates.virtual_machine.base_status(netbox_vm, proxmox_json)
             print(status_updated)
+            next_step = 'tags'
+        elif step == 'tags':
+            print("===>Update tags")
+            print(netbox_vm)
+            try:
+                tag_updated, netbox_vm = updates.extras.base_tag(netbox_vm)
+                print(tag_updated)
+            except Exception as e:
+                print(e)
+                # raise e
             next_step = 'custom_fields'
         elif step == 'custom_fields':
             # Update 'local_context_data' json, if necessary.
             print("===>Update 'custom_fields' field, if necessary.")
-            custom_fields_updated = updates.virtual_machine.custom_fields(netbox_vm, proxmox_json)
+            custom_fields_updated, netbox_vm = updates.virtual_machine.base_custom_fields(netbox_vm, proxmox_json)
+            netbox_vm = get_nb_by_(cluster.name, vmid, node, proxmox_vm_name)
             print(custom_fields_updated)
             next_step = 'local_context'
         elif step == 'local_context':
@@ -585,33 +639,27 @@ def update_vm_process(vm_info_task_id, cluster=None, netbox_vm=None, step='finis
             print("===>Update 'local_context_data' json, if necessary.")
             PROXMOX = proxmox_session.get('PROXMOX')
             PROXMOX_PORT = proxmox_session.get('PROXMOX_PORT')
-            local_context_updated = updates.virtual_machine.local_context_data(netbox_vm, proxmox_json, PROXMOX,
-                                                                               PROXMOX_PORT)
+            local_context_updated, netbox_vm = updates.virtual_machine.base_local_context_data(netbox_vm, proxmox_json,
+                                                                                               PROXMOX,
+                                                                                               PROXMOX_PORT)
             print(local_context_updated)
             next_step = 'resources'
         elif step == 'resources':
             # Update 'resources', like CPU, Memory and Disk, if necessary.
             print("===>Update 'resources', like CPU, Memory and Disk, if necessary.")
-            resources_updated = updates.virtual_machine.resources(netbox_vm, proxmox_json)
+            resources_updated, netbox_vm = updates.virtual_machine.base_resources(netbox_vm, proxmox_json)
             print(resources_updated)
-            next_step = 'tags'
-        elif step == 'tags':
-            print("===>Update tags")
-            print(netbox_vm)
-            try:
-                tag_updated = updates.extras.tag(netbox_vm)
-                print(tag_updated)
-            except Exception as e:
-                print(e)
-                # raise e
             next_step = 'add_ip'
-
         elif step == 'add_ip':
             print("===>Update ips")
-            ip_update = updates.virtual_machine.add_ip(proxmox, netbox_vm, proxmox_json)
+            ip_update, netbox_vm = updates.virtual_machine.base_add_ip(proxmox, netbox_vm, proxmox_json)
+            print(ip_update)
+            next_step = 'add_config'
+        elif step == 'add_config':
+            print("===>Update configuration")
+            ip_update, netbox_vm = updates.virtual_machine.base_add_configuration(proxmox, netbox_vm, proxmox_json)
             print(ip_update)
             next_step = 'finish'
-
         if step == 'finish':
             print('FINISH ALL PROCESS')
             process_vm_info_args = [vm_info_task.task_id]
@@ -766,6 +814,8 @@ def get_vms_for_the_node(node_task_id, task_id, iteration=0):
         for px_vm_each in node_vms_all:
             # if counter > 5:
             #     break
+            if not (px_vm_each['name'] == 'mongodb.cloudapps.test'):
+                continue
             print(px_vm_each)
             is_template = px_vm_each.get("template")
             if is_template == 1:
@@ -776,9 +826,8 @@ def get_vms_for_the_node(node_task_id, task_id, iteration=0):
 
             print(f'34. Run the next function (process_vm_info for {domain}) ')
             print(process_vm_info_args)
-            queue_next_sync(vm_task, process_vm_info, process_vm_info_args, 'process_vm_info')
             # counter = counter + 1
-
+            queue_next_sync(vm_task, process_vm_info, process_vm_info_args, 'process_vm_info')
 
             # vm_updated = virtual_machine(proxmox_json=px_vm_each, proxmox_session=proxmox_session, cluster=cluster)
             # virtualmachines_list.append(vm_updated)
@@ -856,7 +905,8 @@ def get_nodes_for_the_cluster(cluster_data_id, task_id, iteration=0):
 
         for px_node_each in proxmox_nodes:
             try:
-                node_updated = nodes(proxmox_json=px_node_each, proxmox_cluster=proxmox_cluster, proxmox=proxmox)
+                node_updated = nodes(proxmox_json=px_node_each, proxmox_cluster=proxmox_cluster, proxmox=proxmox,
+                                     proxmox_session=proxmox_session)
                 node_response_list.append(px_node_each)
                 print(px_node_each)
             except Exception as e:

@@ -118,13 +118,25 @@ def get_proxmox_session(PROXMOX_SETTING):
     if PROXMOX_TOKEN != None:
         PROXMOX_TOKEN_NAME = PROXMOX_TOKEN.get("name", DEFAULT_PROXMOX_TOKEN_NAME)
         PROXMOX_TOKEN_VALUE = PROXMOX_TOKEN.get("value", DEFAULT_PROXMOX_TOKEN_VALUE)
+
+    NETBOX_VM_ROLE_ID = PROXMOX_SETTING.get("virtualmachine_role_id", DEFAULT_NETBOX_VM_ROLE_ID)
+    NETBOX_NODE_ROLE_ID = PROXMOX_SETTING.get("node_role_id", DEFAULT_NETBOX_NODE_ROLE_ID)
+    NETBOX_SITE_ID = PROXMOX_SETTING.get("site_id", DEFAULT_NETBOX_SITE_ID)
+    NETBOX_SITE_NAME = PROXMOX_SETTING.get("site_name", None)
+    NETBOX_NODE_ROLE_NAME = PROXMOX_SETTING.get("node_role_name", None)
+
     output = {
         'PROXMOX': PROXMOX,
         'PROXMOX_PORT': PROXMOX_PORT,
         'PROXMOX_SSL': PROXMOX_SSL,
         'PROXMOX_TOKEN': PROXMOX_TOKEN,
         'PROXMOX_TOKEN_NAME': PROXMOX_TOKEN_NAME,
-        'PROXMOX_TOKEN_VALUE': PROXMOX_TOKEN_VALUE
+        'PROXMOX_TOKEN_VALUE': PROXMOX_TOKEN_VALUE,
+        'NETBOX_VM_ROLE_ID': NETBOX_VM_ROLE_ID,
+        'NETBOX_NODE_ROLE_ID': NETBOX_NODE_ROLE_ID,
+        'NETBOX_SITE_ID': NETBOX_SITE_ID,
+        'NETBOX_SITE_NAME': NETBOX_SITE_NAME,
+        'NETBOX_NODE_ROLE_NAME': NETBOX_NODE_ROLE_NAME
     }
     ####################################################################################################
     #                                                                                                  #

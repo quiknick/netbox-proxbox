@@ -2,6 +2,8 @@ import requests
 import json
 import re
 
+from django.template.defaultfilters import slugify
+
 # PLUGIN_CONFIG variables
 from ..plugins_config import (
     # PROXMOX,
@@ -19,9 +21,17 @@ from .. import (
     create,
 )
 
+ipv4_regex = r"\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}(\/\d{1,3})?"
+ipv6_regex = r"([a-zA-Z0-9]{1,4}(:[a-zA-Z0-9]{0,4})?(:[a-zA-Z0-9]{0,4})?(:[a-zA-Z0-9]{0,4})?(:[a-zA-Z0-9]{0,4})?(:[a-zA-Z0-9]{0,4})?(:[a-zA-Z0-9]{0,4})?(:[a-zA-Z0-9]{0,4})?(:[a-zA-Z0-9]{0,4})?(:[a-zA-Z0-9]{0,4})?(:[a-zA-Z0-9]{0,4})?(:[a-zA-Z0-9]{0,4})?(:[a-zA-Z0-9]{0,4})?(:[a-zA-Z0-9]{0,4})?:([a-zA-Z0-9]{0,4})?:([a-zA-Z0-9]{0,4})?(\.\d{1,3}\.\d{1,3}\.\d{1,3})?(\/\d{1,3})?)"
+
 
 # Update "status" field on Netbox Virtual Machine based on Proxmox information
 def status(netbox_vm, proxmox_vm):
+    status_updated, netbox_vm = base_status(netbox_vm, proxmox_vm)
+    return status_updated
+
+
+def base_status(netbox_vm, proxmox_vm):
     # False = status not changed on Netbox
     # True  = status changed on Netbox
     status_updated = False
@@ -58,7 +68,7 @@ def status(netbox_vm, proxmox_vm):
         # Status doesn't need to change
         status_updated = False
 
-    return status_updated
+    return status_updated, netbox_vm
 
 
 def site(**kwargs):
@@ -103,8 +113,49 @@ def http_update_custom_fields(**kwargs):
     return r.status_code
 
 
+def http_contact_assing(**kwargs):
+    # Saves kwargs variables
+    domain_with_http = kwargs.get('domain_with_http')
+    token = kwargs.get('token')
+    tenant_id = kwargs.get('tenant_id')
+    contact_id = kwargs.get('contact_id')
+    role_id = kwargs.get('role_id')
+    content_type = kwargs.get('content_type')
+
+    #
+    # HTTP PATCH Request (partially update)
+    #
+    # URL
+    url = '{}/api/tenancy/contact-assignments/'.format(domain_with_http)
+
+    # HTTP Request Headers
+    headers = {
+        "Authorization": "Token {}".format(token),
+        "Content-Type": "application/json"
+    }
+
+    # HTTP Request Body
+    body = {
+        "object_id": tenant_id,
+        "contact": contact_id,
+        "role": role_id,
+        "content_type": content_type
+    }
+
+    # Makes the request and saves it to var
+    r = requests.post(url, data=json.dumps(body), headers=headers)
+
+    # Return HTTP Status Code
+    return r.status_code
+
+
 # Update 'custom_fields' field on Netbox Virtual Machine based on Proxbox
 def custom_fields(netbox_vm, proxmox_vm):
+    s, netbox_vm = base_custom_fields(netbox_vm, proxmox_vm)
+    return s
+
+
+def base_custom_fields(netbox_vm, proxmox_vm):
     # Create the new 'custom_field' with info from Proxmox
     custom_fields_update = {}
 
@@ -160,17 +211,22 @@ def custom_fields(netbox_vm, proxmox_vm):
                 print(
                     "[ERROR] Some error occured trying to update 'custom_fields' through HTTP Request. HTTP Code: {}. -> {}".format(
                         custom_field_updated, netbox_vm.name))
-                return False
+                return False, netbox_vm
 
             else:
                 # If none error occured, considers VM updated.
-                return True
+                return True, netbox_vm
 
-        return False
+        return False, netbox_vm
 
 
 # Update 'local_context_data' field on Netbox Virtual Machine based on Proxbox
 def local_context_data(netbox_vm, proxmox_vm, PROXMOX, PROXMOX_PORT):
+    s, netbox_vm = base_local_context_data(netbox_vm, proxmox_vm, PROXMOX, PROXMOX_PORT)
+    return s
+
+
+def base_local_context_data(netbox_vm, proxmox_vm, PROXMOX, PROXMOX_PORT):
     current_local_context = netbox_vm.local_context_data
 
     proxmox_values = {}
@@ -194,7 +250,7 @@ def local_context_data(netbox_vm, proxmox_vm, PROXMOX, PROXMOX_PORT):
     if current_local_context == None:
         netbox_vm.local_context_data = {"proxmox": proxmox_values}
         netbox_vm.save()
-        return True
+        return True, netbox_vm
 
     # Compare current Netbox values with Porxmox values
     elif current_local_context.get('proxmox') != proxmox_values:
@@ -203,17 +259,22 @@ def local_context_data(netbox_vm, proxmox_vm, PROXMOX, PROXMOX_PORT):
 
         netbox_vm.local_context_data = current_local_context
         netbox_vm.save()
-        return True
+        return True, netbox_vm
 
     # If 'local_context_data' already updated
     else:
-        return False
+        return False, netbox_vm
 
-    return False
+    return False, netbox_vm
 
 
 # Updates following fields based on Proxmox: "vcpus", "memory", "disk", if necessary.
 def resources(netbox_vm, proxmox_vm):
+    s, netbox_vm = resources(netbox_vm, proxmox_vm)
+    return s
+
+
+def base_resources(netbox_vm, proxmox_vm):
     # Save values from Proxmox
     vcpus = float(proxmox_vm["maxcpu"])
 
@@ -260,56 +321,116 @@ def resources(netbox_vm, proxmox_vm):
         resources_updated = netbox_vm.update(new_resources_json)
 
         if resources_updated == True:
-            return True
+            return True, netbox_vm
         else:
-            return False
+            return False, netbox_vm
+    return False, netbox_vm
 
 
-def get_ip(proxmox, node, vmid, type):
-    test_str = None
-    try:
-        if type == 'qemu':
-            config1 = proxmox.nodes(node).qemu(vmid).config.get()
-            test_str = config1['ipconfig0']
-        if type == 'lxc':
-            config2 = proxmox.nodes(node).lxc(vmid).config.get()
-            test_str = config2['net0']
-    except Exception as e:
-        test_str = None
-        pass
-    if test_str is None:
-        return None
+# def get_ip(proxmox, node, vmid, type):
+#     test_str = None
+#     try:
+#         if type == 'qemu':
+#             config1 = proxmox.nodes(node).qemu(vmid).config.get()
+#             test_str = config1['ipconfig0']
+#         if type == 'lxc':
+#             config2 = proxmox.nodes(node).lxc(vmid).config.get()
+#             test_str = config2['net0']
+#     except Exception as e:
+#         test_str = None
+#         pass
+#     if test_str is None:
+#         return None
+#
+#     regex = r"ip=\d(\d)?(\d)?.\d(\d)?(\d)?.\d(\d)?(\d)?.\d(\d)?(\d)?(\/(\d)?(\d)?(\d)?)?"
+#
+#     # test_str = "name=eth0,bridge=vmbr504,firewall=1,gw=172.16.19.1,hwaddr=5A:70:3F:05:0D:AC,ip=172.16.19.251/24,type=veth"
+#     try:
+#         matches = re.finditer(regex, test_str, re.MULTILINE)
+#         it = matches.__next__()
+#         ip = it.group().replace('ip=', '').strip()
+#         return ip
+#     except Exception as e:
+#         return None
+#         pass
 
-    regex = r"ip=\d(\d)?(\d)?.\d(\d)?(\d)?.\d(\d)?(\d)?.\d(\d)?(\d)?(\/(\d)?(\d)?(\d)?)?"
-
+def get_ip(test_str):
+    print('[OK] parsing ipv4. -> {}'.format(test_str))
+    regex = r"ip=" + ipv4_regex
     # test_str = "name=eth0,bridge=vmbr504,firewall=1,gw=172.16.19.1,hwaddr=5A:70:3F:05:0D:AC,ip=172.16.19.251/24,type=veth"
     try:
         matches = re.finditer(regex, test_str, re.MULTILINE)
         it = matches.__next__()
         ip = it.group().replace('ip=', '').strip()
+        print('[OK] Parse. -> {}'.format(ip))
         return ip
     except Exception as e:
         return None
         pass
 
 
-def add_ip(proxmox, netbox_vm, proxmox_vm):
+def get_ipv6(test_str):
+    # ipv6 regex
+    print('[OK] parsing ipv6. -> {}'.format(test_str))
+    regex = r"ip6=" + ipv6_regex
+
+    # test_str = "name=eth0,bridge=vmbr502,gw=172.16.17.1,gw6=fc00:16:17::1,hwaddr=CA:F3:00:D6:31:2A,ip=172.16.17.203/24,ip6=2001:db8:3:4::192.0.2.33/64,type=veth"
     try:
-        # Get the ip from the configuration of the vm
-        ip_addresses = get_ip(proxmox, proxmox_vm['node'], proxmox_vm['vmid'], proxmox_vm['type'])
-        # if no ip is retrieve do nothing
-        if ip_addresses is None:
-            return False
-        # Check if the vm has already assigned a main ip address
+        matches = re.finditer(regex, test_str, re.MULTILINE | re.IGNORECASE)
+        it = matches.__next__()
+        ip = it.group().replace('ip6=', '').strip()
+        print('[OK] Parse. -> {}'.format(ip))
+        return ip
+    except Exception as e:
+        return None
+        pass
+
+
+def get_main_ip(test_str):
+    ipv4 = None
+    ipv6 = None
+
+    try:
+        print('[OK] Parsing main ip for ipv4 -> {}')
+        matches = re.finditer(r"main(\s)?ip:(\s)?" + ipv4_regex, test_str, re.MULTILINE | re.IGNORECASE)
+        it = matches.__next__()
+        ipv4 = it.group().strip()
+    except Exception as e:
+        pass
+    try:
+        print('[OK] Parsing main ip for ipv6')
+        matches = re.finditer(r"main(\s)?ip:(\s)?" + ipv6_regex, test_str, re.MULTILINE | re.IGNORECASE)
+        it = matches.__next__()
+        ipv6 = it.group().strip()
+    except Exception as e:
+        pass
+    try:
+        if ipv4 is None:
+            print('[OK] Parsing ip address allocation for ipv4')
+            matches = re.finditer(r"ip(\s)?address(\s)?allocation:(\s)?" + ipv4_regex, test_str,
+                                  re.MULTILINE | re.IGNORECASE)
+            it = matches.__next__()
+            ipv4 = it.group().strip()
+    except Exception as e:
+        pass
+    try:
+        if ipv6 is None:
+            print('[OK] Parsing ip address allocation for ipv6')
+            matches = re.finditer(r"ip(\s)?address(\s)?allocation:(\s)?" + ipv6_regex, test_str,
+                                  re.MULTILINE | re.IGNORECASE)
+            it = matches.__next__()
+            ipv6 = it.group().strip()
+    except Exception as e:
+        pass
+    return ipv4, ipv6
+
+
+def set_ipv4(netbox_vm, vm_interface, ipv4):
+    if ipv4 is not None:
         if netbox_vm.primary_ip4 is None:
-            # Create the interface that is going to allocate the ip
-            virtual_machine = netbox_vm.id
-            name = 'eth0'
-            new_interface_json = {"virtual_machine": virtual_machine, "name": name}
-            vm_interface = nb.virtualization.interfaces.create(new_interface_json)
             # Create the ip address and link it to the interface previously created
             address = {
-                "address": ip_addresses,
+                "address": ipv4,
                 "assigned_object_type": "virtualization.vminterface",
                 "assigned_object_id": vm_interface.id
             }
@@ -317,16 +438,374 @@ def add_ip(proxmox, netbox_vm, proxmox_vm):
             # Associate the ip address to the vm
             netbox_vm.primary_ip = netbox_ip
             netbox_vm.primary_ip4 = netbox_ip
-            netbox_vm.save()
+            # netbox_vm.save()
         else:
-            # Update the ip address associated to the interface
             id = netbox_vm.primary_ip4.id
             current_ip = nb.ipam.ip_addresses.get(id=id)
-            current_ip.address = ip_addresses
+            current_ip.address = ipv4
             current_ip.save()
             netbox_vm.primary_ip = current_ip
             netbox_vm.primary_ip4 = current_ip
-            netbox_vm.save()
-        return True
+            # netbox_vm.save()
+    return netbox_vm
+
+
+def set_ipv6(netbox_vm, vm_interface, ipv6):
+    if ipv6 is not None:
+        if netbox_vm.primary_ip6 is None:
+            # Create the ip address and link it to the interface previously created
+            address = {
+                "address": ipv6,
+                "assigned_object_type": "virtualization.vminterface",
+                "assigned_object_id": vm_interface.id
+            }
+            netbox_ip = nb.ipam.ip_addresses.create(address)
+            # Associate the ip address to the vm
+            netbox_vm.primary_ip = netbox_ip
+            netbox_vm.primary_ip6 = netbox_ip
+            # netbox_vm.save()
+        else:
+            id = netbox_vm.primary_ip6.id
+            current_ip = nb.ipam.ip_addresses.get(id=id)
+            current_ip.address = ipv6
+            current_ip.save()
+            if netbox_vm.primary_ip6 is None:
+                netbox_vm.primary_ip = current_ip
+            netbox_vm.primary_ip6 = current_ip
+            # netbox_vm.save()
+
+    return netbox_vm
+
+
+def get_set_interface(name, virtual_machine):
+    vm_interface = nb.virtualization.interfaces.get(name=name, virtual_machine_id=virtual_machine)
+    if vm_interface is None:
+        new_interface_json = {"virtual_machine": virtual_machine, "name": name}
+        vm_interface = nb.virtualization.interfaces.create(new_interface_json)
+
+    return vm_interface
+
+
+def client_tenant_parser(test_str):
+    client = None
+    tenant_name = None
+    client_regex = r"client(\s)?(:)?.*(id)?:"
+    try:
+        matches = re.finditer(client_regex, test_str, re.MULTILINE | re.IGNORECASE)
+        it = matches.__next__()
+        client = it.group() \
+            .replace('client:', '') \
+            .replace('client :', '') \
+            .replace('Client:', '') \
+            .replace('Client :', '') \
+            .replace('id:', '') \
+            .replace('id :', '') \
+            .replace('(id :', '') \
+            .replace('(ID:', '') \
+            .replace('Id:', '') \
+            .replace('Id :', '') \
+            .replace('(Id :', '') \
+            .replace('(ID :', '') \
+            .strip()
+        sub_str_regex = r"\(.*\)"
+        m_result = None
+        try:
+            m_result = re.finditer(sub_str_regex, client, re.MULTILINE | re.IGNORECASE).__next__().group().strip()
+        except Exception as e:
+            print(e)
+            pass
+        if m_result:
+            if m_result.replace('(', '').replace(')', '').strip():
+                tenant_name = m_result.replace('(', '').replace(')', '').strip()
+            client = client.replace(m_result, '').strip()
+        else:
+            tenant_name = client
+        print('[OK] Tenant parse. -> {}'.format(client))
     except Exception as e:
-        return False
+        pass
+    return tenant_name, client
+
+
+def get_set_tenant_from_configuration(test_str):
+    tenant_name, client = client_tenant_parser(test_str)
+    nb_tenant = nb.tenancy.tenants.get(name=tenant_name)
+    if nb_tenant is None:
+        new_tenant = {"name": tenant_name, "slug": slugify(tenant_name)}
+        nb_tenant = nb.tenancy.tenants.create(new_tenant)
+    set_assign_contact(test_str, client, nb_tenant.id, 'tenancy.tenant')
+    return nb_tenant
+
+
+def contact_parse_set(test_str, name):
+    contact = None
+    contact_role = None
+    try:
+        print('[OK] Parsing contact from. -> {}'.format(test_str))
+        contact_email = None
+        contact_regex = r"email(\s)?(:)?(\s)?\w+([\.-]?\w+)*@\w+([\.-]?\w+)*(\.\w{2,3})+"
+        try:
+            matches = re.finditer(contact_regex, test_str, re.MULTILINE | re.IGNORECASE)
+            it = matches.__next__()
+            contact_email = it.group() \
+                .replace('email:', '') \
+                .replace('email :', '') \
+                .replace('Email:', '') \
+                .replace('Email :', '') \
+                .strip()
+            print('[OK] Contact email parsed. -> {}'.format(contact_email))
+        except Exception as e:
+            print(e)
+        if contact_email is None:
+            return None, None
+
+        contact = nb.tenancy.contacts.get(email=contact_email)
+        if contact is None:
+            print('[OK] Creating contact for {} with email {}'.format(name, contact_email))
+            new_contact = {"name": name, "email": contact_email}
+            contact = nb.tenancy.contacts.create(new_contact)
+
+        contact_role = nb.tenancy.contact_roles.get(name="vm")
+        if contact_role is None:
+            print('[OK] Creating role. -> {}'.format("vm"))
+            new_contact_role = {"name": "vm", "slug": slugify("vm")}
+            contact_role = nb.tenancy.contact_roles.create(new_contact_role)
+    except Exception as e:
+        print(e)
+
+    return contact, contact_role
+
+
+def set_contact_to_vm(test_str, netbox_vm):
+    content_type = 'virtualization.virtualmachine'
+    try:
+        print('[OK] Parsing contact from. -> {}'.format(test_str))
+        tenant = netbox_vm.tenant
+        tenant_name, client = client_tenant_parser(test_str)
+        set_assign_contact(test_str, client, netbox_vm.id, content_type)
+        return netbox_vm
+    except Exception as e:
+        print(e)
+        return netbox_vm
+
+
+def set_assign_contact(test_str, name, object_id, content_type='tenancy.tenant'):
+    contact = None
+    contact_role = None
+    contact_assigment = None
+    try:
+        contact, contact_role = contact_parse_set(test_str, name)
+        if not (contact and contact_role):
+            return contact, contact_role, contact_assigment
+        contact_assigment = nb.tenancy.contact_assignments.get(object_id=object_id,
+                                                               contact_id=contact.id,
+                                                               content_type=content_type,
+                                                               role_id=contact_role.id)
+        if contact_assigment is None:
+            print('[OK] Assigning contact {} to tenant {}'.format(contact.name, name))
+
+            new_contact_assigment = {"object_id": object_id,
+                                     "contact": contact.id,
+                                     "content_type": content_type,
+                                     "contact_id": contact.id,
+                                     "role": contact_role.id,
+                                     "priority": "primary"
+                                     }
+            contact_assigment = nb.tenancy.contact_assignments.create(new_contact_assigment)
+            print('[OK] Contact assigned {} to tenant {}'.format(contact.name, name))
+            # assign_contact_to_tenant(tenant, contact, contact_role, content_type)
+    except Exception as e:
+        print(e)
+    return contact, contact_role, contact_assigment
+
+
+#
+# def assign_contact_to_tenant(tenant, contact, role, content_type):
+#     custom_field_updated = http_contact_assing(
+#         domain_with_http=NETBOX,
+#         token=NETBOX_TOKEN,
+#         tenant_id=tenant.id,
+#         contact_id=contact.id,
+#         role_id=role.id,
+#         content_type=content_type.app_label + '.' + content_type.model
+#     )
+#
+#     # Verify HTTP reply CODE
+#     if custom_field_updated != 200:
+#         print(
+#             "[ERROR] Some error occured trying to update 'custom_fields' through HTTP Request. HTTP Code: {}.".format(
+#                 custom_field_updated))
+#         return False
+#
+#     else:
+#         # If none error occured, considers VM updated.
+#         return True
+
+def get_set_tenant_group(tenant, netbox_vm):
+    tags = netbox_vm.tags
+    tags_name = []
+    tenant_group_name = 'Customers'
+    for tag in tags:
+        if not ('Proxbox' == tag):
+            tags_name.append(tag.name)
+    if 'EdgeUno' in tags_name:
+        tenant_group_name = 'EdgeUno'
+    tenant_group = nb.tenancy.tenant_groups.get(name=tenant_group_name)
+    if tenant_group is None:
+        new_tenant_group = {"name": tenant_group_name, "slug": slugify(tenant_group_name)}
+        tenant_group = nb.tenancy.contact_roles.create(new_tenant_group)
+    tenant.group_id = tenant_group.id
+    tenant.group = tenant_group
+    tenant.save()
+    return tenant
+
+
+def set_tenant(netbox_vm, observation):
+    print('[OK] Getting tenant from. -> {}'.format(observation))
+    tenant = get_set_tenant_from_configuration(observation)
+    if tenant is None:
+        return netbox_vm
+    tenant = get_set_tenant_group(tenant, netbox_vm)
+
+    netbox_vm.tenant_id = tenant.id
+    netbox_vm.tenant = tenant
+    if observation:
+        netbox_vm.comments = observation
+    netbox_vm.save()
+
+    return netbox_vm
+
+
+def add_ip(proxmox, netbox_vm, proxmox_vm):
+    s, netbox_vm = base_add_ip(proxmox, netbox_vm, proxmox_vm)
+    return s
+
+
+def base_add_ip(proxmox, netbox_vm, proxmox_vm):
+    vm_type = proxmox_vm['type']
+    vmid = proxmox_vm['vmid']
+    node = proxmox_vm['node']
+    config = None
+    network_str = None
+    ipv4 = None
+    ipv6 = None
+    try:
+        if vm_type == 'qemu':
+            config = proxmox.nodes(node).qemu(vmid).config.get()
+            print('[OK] Got Configuration for quemu. -> {}'.format(vmid))
+        if vm_type == 'lxc':
+            config = proxmox.nodes(node).lxc(vmid).config.get()
+            print('[OK] Got Configuration for lxc. -> {}'.format(vmid))
+    except  Exception as e:
+        print(e)
+        config = None
+
+    if config is None:
+        return False, netbox_vm
+
+    try:
+        if vm_type == 'qemu':
+            if 'ipconfig0' in config:
+                network_str = config['ipconfig0']
+            elif 'net0' in config:
+                network_str = config['net0']
+        if vm_type == 'lxc':
+            if 'net0' in config:
+                network_str = config['net0']
+            elif 'ipconfig0' in config:
+                network_str = config['ipconfig0']
+    except  Exception as e:
+        network_str = None
+
+    try:
+        if network_str is not None:
+            ipv4 = get_ip(network_str)
+            ipv6 = get_ipv6(network_str)
+            if ipv4 is None and ipv6 is None:
+                print('[OK] ipv4 or ipv6 not found searching in the observations for . -> {}'.format(vmid))
+                if 'description' in config:
+                    ipv4, ipv6 = get_main_ip(config['description'])
+            if not (ipv4 is None and ipv6 is None):
+                virtual_machine = netbox_vm.id
+                name = 'eth0'
+                # Create the interface if doesn't exists
+                try:
+                    vm_interface = get_set_interface(name, virtual_machine)
+                    netbox_vm = set_ipv6(netbox_vm, vm_interface, ipv6)
+                    netbox_vm = set_ipv4(netbox_vm, vm_interface, ipv4)
+                except Exception as e:
+                    print(e)
+                netbox_vm.save()
+    except Exception as e:
+        print(e)
+    return True, netbox_vm
+
+
+def add_configuration(proxmox, netbox_vm, proxmox_vm):
+    s, netbox_vm = base_add_configuration(proxmox, netbox_vm, proxmox_vm)
+    return s
+
+
+def base_add_configuration(proxmox, netbox_vm, proxmox_vm):
+    vm_type = proxmox_vm['type']
+    vmid = proxmox_vm['vmid']
+    node = proxmox_vm['node']
+    config = None
+    try:
+        if vm_type == 'qemu':
+            config = proxmox.nodes(node).qemu(vmid).config.get()
+            print('[OK] Got Configuration for quemu. -> {}'.format(vmid))
+        if vm_type == 'lxc':
+            config = proxmox.nodes(node).lxc(vmid).config.get()
+            print('[OK] Got Configuration for lxc. -> {}'.format(vmid))
+    except Exception as e:
+        print(e)
+        config = None
+
+    if config is None:
+        return False, netbox_vm
+
+    try:
+        if 'description' in config:
+            netbox_vm = set_tenant(netbox_vm, config['description'])
+            netbox_vm = set_contact_to_vm(config['description'], netbox_vm)
+    except Exception as e:
+        print(e)
+    return True, netbox_vm
+
+# def add_ip(proxmox, netbox_vm, proxmox_vm):
+#     try:
+#         # Get the ip from the configuration of the vm
+#         ip_addresses = get_ip(proxmox, proxmox_vm['node'], proxmox_vm['vmid'], proxmox_vm['type'])
+#         # if no ip is retrieve do nothing
+#         if ip_addresses is None:
+#             return False
+#         # Check if the vm has already assigned a main ip address
+#         if netbox_vm.primary_ip4 is None:
+#             # Create the interface that is going to allocate the ip
+#             virtual_machine = netbox_vm.id
+#             name = 'eth0'
+#             new_interface_json = {"virtual_machine": virtual_machine, "name": name}
+#             vm_interface = nb.virtualization.interfaces.create(new_interface_json)
+#             # Create the ip address and link it to the interface previously created
+#             address = {
+#                 "address": ip_addresses,
+#                 "assigned_object_type": "virtualization.vminterface",
+#                 "assigned_object_id": vm_interface.id
+#             }
+#             netbox_ip = nb.ipam.ip_addresses.create(address)
+#             # Associate the ip address to the vm
+#             netbox_vm.primary_ip = netbox_ip
+#             netbox_vm.primary_ip4 = netbox_ip
+#             netbox_vm.save()
+#         else:
+#             # Update the ip address associated to the interface
+#             id = netbox_vm.primary_ip4.id
+#             current_ip = nb.ipam.ip_addresses.get(id=id)
+#             current_ip.address = ip_addresses
+#             current_ip.save()
+#             netbox_vm.primary_ip = current_ip
+#             netbox_vm.primary_ip4 = current_ip
+#             netbox_vm.save()
+#         return True
+#     except Exception as e:
+#         return False

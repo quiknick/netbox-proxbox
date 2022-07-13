@@ -6,10 +6,7 @@ from ..plugins_config import (
 
 def custom_tag(tag_name, tag_slug, tag_description="No description"):
     # Check if Proxbox tag already exists.
-    proxbox_tag = nb.extras.tags.get(
-        name=tag_name,
-        slug=tag_slug
-    )
+    proxbox_tag = nb.extras.tags.get(slug=tag_slug)
 
     if proxbox_tag == None:
         try:
@@ -46,6 +43,11 @@ def tag():
 def role(**kwargs):
     # If role_id equals to 0, consider it is not configured by user and must be created by Proxbox
     role_id = kwargs.get("role_id", 0)
+    role_name = kwargs.get('role_name', None)
+    if role_name:
+        role = nb.dcim.device_roles.get(name=role_name)
+        if role:
+            return role
 
     if not isinstance(role_id, int):
         return 'Role ID must be INTEGER. Netbox PLUGINS_CONFIG is configured incorrectly.'
