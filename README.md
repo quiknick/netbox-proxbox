@@ -161,7 +161,10 @@ PLUGINS_CONFIG = {
             'settings': {
                 'virtualmachine_role_id': 0,
                 'node_role_id': 0,
-                'site_id': 0
+                'site_id': 0,
+                'tenant_name': 'EdgeUno', # Set the custom tags and tenant for own machines
+                'tenant_regex_validator': '.*', # Set a regex for matching the name of the machines to give then the tenat and tag
+                'tenant_description': 'The vm belongs to Edgeuno' # A description of the tenant and the tag
             }
         }
     }
@@ -235,7 +238,11 @@ The following options are available:
 * `netbox.settings.virtualmachine_role_id`: (Integer) Role ID to be used by Proxbox when creating Virtual
   Machines (`deprecated`).
 * `netbox.settings.node_role_id`: (Integer) Role ID to be used by Proxbox when creating Nodes (Devices)(`deprecated`).
-* `netbox.settings.site_id` (Integer) Site ID to be used by Proxbox when creating Nodes (Devices)(`deprecated`).
+* `netbox.settings.site_id`: (Integer) Site ID to be used by Proxbox when creating Nodes (Devices)(`deprecated`).
+* `netbox.settings.tenant_name`: (String) Set the custom tags and tenant for own machines.
+* `netbox.settings.tenant_regex_validator`: (String) Set a regex for matching the name of the machines to give then the tenat and tag.
+* `netbox.settings.tenant_description`: (String) description of the tenant and the tag.
+
 
 ---
 

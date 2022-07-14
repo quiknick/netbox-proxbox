@@ -63,19 +63,23 @@ def vm_full_update(proxmox_session, netbox_vm, proxmox_vm):
 
 
 def node_full_update(proxmox, netbox_node, proxmox_json, proxmox_cluster):
-    changes = {}
+    try:
+        changes = {}
 
-    status_updated = updates.node.status(netbox_node, proxmox_json)
-    cluster_updated = updates.node.cluster(proxmox, netbox_node, proxmox_json, proxmox_cluster)
-    ip_updated = updates.node.interface_ip_assign(netbox_node, proxmox_json)
+        status_updated = updates.node.status(netbox_node, proxmox_json)
+        cluster_updated = updates.node.cluster(proxmox, netbox_node, proxmox_json, proxmox_cluster)
+        ip_updated = updates.node.interface_ip_assign(netbox_node, proxmox_json)
 
-    changes = {
-        "status": status_updated,
-        "cluster": cluster_updated,
-        "ip": ip_updated
-    }
+        changes = {
+            "status": status_updated,
+            "cluster": cluster_updated,
+            "ip": ip_updated
+        }
 
-    return changes
+        return changes
+    except Exception as e:
+        print(e)
+        raise e
 
 
 # Verify if VM/CT exist on Netbox
@@ -366,33 +370,58 @@ def find_node_by_ip(ip):
 
 
 def nodes(**kwargs):
-    proxmox_cluster = kwargs.get('proxmox_cluster')
-    proxmox_json = kwargs.get('proxmox_json')
-    proxmox = kwargs.get('proxmox')
-    proxmox_session = kwargs.get('proxmox_session', None)
+    try:
+        proxmox_cluster = kwargs.get('proxmox_cluster')
+        proxmox_json = kwargs.get('proxmox_json')
+        proxmox = kwargs.get('proxmox')
+        proxmox_session = kwargs.get('proxmox_session', None)
 
-    node_ip = proxmox_json.get("ip", None)
+        node_ip = proxmox_json.get("ip", None)
 
-    proxmox_node_name = proxmox_json.get("name")
+        proxmox_node_name = proxmox_json.get("name")
 
-    json_node = {}
+        json_node = {}
 
-    # Search netbox using VM name
-    if node_ip:
-        netbox_search = find_node_by_ip(node_ip)
-    if netbox_search is None:
-        netbox_search = nb.dcim.devices.get(name=proxmox_node_name)
+        # Search netbox using VM name
+        if node_ip:
+            netbox_search = find_node_by_ip(node_ip)
+        if netbox_search is None:
+            netbox_search = nb.dcim.devices.get(name=proxmox_node_name)
 
-    # Search node on Netbox with Proxmox node name gotten
-    if netbox_search == None:
-        # If node does not exist, create it.
-        netbox_node = create.dcim.node(proxmox, proxmox_json, proxmox_session)
+        # Search node on Netbox with Proxmox node name gotten
+        if netbox_search == None:
+            # If node does not exist, create it.
+            netbox_node = create.dcim.node(proxmox, proxmox_json, proxmox_session)
 
-        # Node created
-        if netbox_node != None:
-            print("[OK] Node created! -> {}".format(proxmox_node_name))
+            # Node created
+            if netbox_node != None:
+                print("[OK] Node created! -> {}".format(proxmox_node_name))
 
-            # Update rest of configuration
+                # Update rest of configuration
+                full_update = node_full_update(proxmox, netbox_node, proxmox_json, proxmox_cluster)
+                json_node["changes"] = full_update
+
+                full_update_list = list(full_update.values())
+
+                # Analyze if update was successful
+                if True in full_update_list:
+                    print('[OK] NODE updated. -> {}'.format(proxmox_node_name))
+                else:
+                    print('[OK] NODE already updated. -> {}'.format(proxmox_node_name))
+
+                # return True as the node was successfully created.
+                json_node["result"] = True
+
+            # Error with node creation
+            else:
+                print('[ERROR] Something went wrong when creating the node.-> {}'.format(proxmox_node_name))
+                json_node["result"] = False
+
+        else:
+            # If node already exist, try updating it.
+            netbox_node = netbox_search
+
+            # Update Netbox node information, if necessary.
             full_update = node_full_update(proxmox, netbox_node, proxmox_json, proxmox_cluster)
             json_node["changes"] = full_update
 
@@ -407,31 +436,10 @@ def nodes(**kwargs):
             # return True as the node was successfully created.
             json_node["result"] = True
 
-        # Error with node creation
-        else:
-            print('[ERROR] Something went wrong when creating the node.-> {}'.format(proxmox_node_name))
-            json_node["result"] = False
-
-    else:
-        # If node already exist, try updating it.
-        netbox_node = netbox_search
-
-        # Update Netbox node information, if necessary.
-        full_update = node_full_update(proxmox, netbox_node, proxmox_json, proxmox_cluster)
-        json_node["changes"] = full_update
-
-        full_update_list = list(full_update.values())
-
-        # Analyze if update was successful
-        if True in full_update_list:
-            print('[OK] NODE updated. -> {}'.format(proxmox_node_name))
-        else:
-            print('[OK] NODE already updated. -> {}'.format(proxmox_node_name))
-
-        # return True as the node was successfully created.
-        json_node["result"] = True
-
-    return json_node
+        return json_node
+    except Exception as e:
+        print(e)
+        return None
 
 
 def run_process_in_thread(proxmox_session, key, result, index, **kwargs):
