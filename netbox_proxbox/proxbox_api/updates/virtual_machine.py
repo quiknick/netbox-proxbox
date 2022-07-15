@@ -736,7 +736,7 @@ def base_add_ip(proxmox, netbox_vm, proxmox_vm):
             config = proxmox.nodes(node).lxc(vmid).config.get()
             print('[OK] Got Configuration for lxc. -> {}'.format(vmid))
     except  Exception as e:
-        print("Error: base_add_ip-1 - {}".format(e.message))
+        print("Error: base_add_ip-1 - {}".format(e))
         print(e)
         config = None
 
@@ -755,7 +755,7 @@ def base_add_ip(proxmox, netbox_vm, proxmox_vm):
             elif 'ipconfig0' in config:
                 network_str = config['ipconfig0']
     except  Exception as e:
-        print("Error: base_add_ip-2 - {}".format(e.message))
+        print("Error: base_add_ip-2 - {}".format(e))
         network_str = None
 
     try:
