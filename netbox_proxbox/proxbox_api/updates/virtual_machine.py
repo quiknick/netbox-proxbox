@@ -15,7 +15,8 @@ from ..plugins_config import (
     NETBOX_TOKEN,
     NETBOX_TENANT_NAME,
     NETBOX_TENANT_REGEX_VALIDATOR,
-    # PROXMOX_SESSION as proxmox,
+    NETBOX_VM_ROLE_ID,
+    NETBOX_VM_ROLE_NAME,
     NETBOX_SESSION as nb,
 )
 
@@ -76,6 +77,23 @@ def base_status(netbox_vm, proxmox_vm):
 def site(**kwargs):
     # If site_id equals to 0, consider it is not configured by user and must be created by Proxbox
     site_id = kwargs.get('site_id', 0)
+
+
+def update_vm_role(netbox_vm, proxmox_vm):
+    vm_type = proxmox_vm['type']
+    role_name = NETBOX_VM_ROLE_NAME
+    try:
+        if vm_type == 'qemu':
+            role_name = "VPS"
+        if vm_type == 'lxc':
+            role_name = "LXC"
+    except  Exception as e:
+        pass
+    role = create.extras.role(role_id=NETBOX_VM_ROLE_ID, role_name=role_name)
+    netbox_vm.role_id = role.id
+    netbox_vm.role = role
+    netbox_vm.save()
+    return True, netbox_vm
 
 
 # Function that modifies 'custom_field' of Netbox Virtual Machine.
@@ -393,7 +411,7 @@ def get_main_ip(test_str):
     ipv6 = None
 
     try:
-        print('[OK] Parsing main ip for ipv4 -> {}')
+        print('[OK] Parsing main ip for ipv4 -> {}').format(test_str)
         rgx = r"main(\s)?ip:(\s)?"
         matches = re.finditer(rgx + ipv4_regex, test_str, re.MULTILINE | re.IGNORECASE)
         it = matches.__next__()

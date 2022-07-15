@@ -99,7 +99,7 @@ def get_virtual_machine_data(proxmox, proxmox_vm):
     vm_json["name"] = proxmox_vm['name']
     vm_json["status"] = 'active'
     vm_json["cluster"] = cluster(proxmox).id
-    vm_json["role"] = extras.role(role_id=NETBOX_VM_ROLE_ID).id
+    # vm_json["role"] = extras.role(role_id=NETBOX_VM_ROLE_ID).id
     vm_json["tags"] = [extras.tag().id]
     return vm_json
 

@@ -613,9 +613,14 @@ def update_vm_process(vm_info_task_id, cluster=None, netbox_vm=None, step='finis
 
         print(f'***>SELECTING OPTION FOR: {step}<***')
         if step == 'status':
-            print("===>Update 'status' field, if necessary.")
-            status_updated, netbox_vm = updates.virtual_machine.base_status(netbox_vm, proxmox_json)
-            print(status_updated)
+            try:
+                print("===>Update 'status' field, if necessary.")
+                status_updated, netbox_vm = updates.virtual_machine.base_status(netbox_vm, proxmox_json)
+                print(status_updated)
+            except Exception as e:
+                print(e)
+                vm_info_task.message = "{}==>{}".format(step, e.message)
+                vm_info_task.save()
             next_step = 'tags'
         elif step == 'tags':
             print("===>Update tags")
@@ -625,41 +630,80 @@ def update_vm_process(vm_info_task_id, cluster=None, netbox_vm=None, step='finis
                 print(tag_updated)
             except Exception as e:
                 print(e)
+                vm_info_task.message = "{}==>{}".format(step, e.message)
+                vm_info_task.save()
                 # raise e
             next_step = 'custom_fields'
         elif step == 'custom_fields':
             # Update 'local_context_data' json, if necessary.
-            print("===>Update 'custom_fields' field, if necessary.")
-            custom_fields_updated, netbox_vm = updates.virtual_machine.base_custom_fields(netbox_vm, proxmox_json)
-            netbox_vm = get_nb_by_(cluster.name, vmid, node, proxmox_vm_name)
-            print(custom_fields_updated)
+            try:
+                print("===>Update 'custom_fields' field, if necessary.")
+                custom_fields_updated, netbox_vm = updates.virtual_machine.base_custom_fields(netbox_vm, proxmox_json)
+                netbox_vm = get_nb_by_(cluster.name, vmid, node, proxmox_vm_name)
+                print(custom_fields_updated)
+            except Exception as e:
+                print(e)
+                vm_info_task.message = "{}==>{}".format(step, e.message)
+                vm_info_task.save()
             next_step = 'local_context'
         elif step == 'local_context':
             # Update 'local_context_data' json, if necessary.
             print("===>Update 'local_context_data' json, if necessary.")
-            PROXMOX = proxmox_session.get('PROXMOX')
-            PROXMOX_PORT = proxmox_session.get('PROXMOX_PORT')
-            local_context_updated, netbox_vm = updates.virtual_machine.base_local_context_data(netbox_vm, proxmox_json,
-                                                                                               PROXMOX,
-                                                                                               PROXMOX_PORT)
-            print(local_context_updated)
+            try:
+                PROXMOX = proxmox_session.get('PROXMOX')
+                PROXMOX_PORT = proxmox_session.get('PROXMOX_PORT')
+                local_context_updated, netbox_vm = updates.virtual_machine.base_local_context_data(netbox_vm,
+                                                                                                   proxmox_json,
+                                                                                                   PROXMOX,
+                                                                                                   PROXMOX_PORT)
+                print(local_context_updated)
+            except Exception as e:
+                print(e)
+                vm_info_task.message = "{}==>{}".format(step, e.message)
+                vm_info_task.save()
             next_step = 'resources'
         elif step == 'resources':
             # Update 'resources', like CPU, Memory and Disk, if necessary.
-            print("===>Update 'resources', like CPU, Memory and Disk, if necessary.")
-            resources_updated, netbox_vm = updates.virtual_machine.base_resources(netbox_vm, proxmox_json)
-            print(resources_updated)
+            try:
+                print("===>Update 'resources', like CPU, Memory and Disk, if necessary.")
+                resources_updated, netbox_vm = updates.virtual_machine.base_resources(netbox_vm, proxmox_json)
+                print(resources_updated)
+            except Exception as e:
+                print(e)
+                vm_info_task.message = "{}==>{}".format(step, e.message)
+                vm_info_task.save()
             next_step = 'add_ip'
         elif step == 'add_ip':
             print("===>Update ips")
-            ip_update, netbox_vm = updates.virtual_machine.base_add_ip(proxmox, netbox_vm, proxmox_json)
-            print(ip_update)
+            try:
+                ip_update, netbox_vm = updates.virtual_machine.base_add_ip(proxmox, netbox_vm, proxmox_json)
+                print(ip_update)
+            except Exception as e:
+                print(e)
+                vm_info_task.message = "{}==>{}".format(step, e.message)
+                vm_info_task.save()
             next_step = 'add_config'
         elif step == 'add_config':
             print("===>Update configuration")
-            ip_update, netbox_vm = updates.virtual_machine.base_add_configuration(proxmox, netbox_vm, proxmox_json)
-            print(ip_update)
+            try:
+                ip_update, netbox_vm = updates.virtual_machine.base_add_configuration(proxmox, netbox_vm, proxmox_json)
+                print(ip_update)
+            except Exception as e:
+                print(e)
+                vm_info_task.message = "{}==>{}".format(step, e.message)
+                vm_info_task.save()
+            next_step = 'type_role'
+        elif step == 'type_role':
+            print("===>Update 'type_role' field, if necessary.")
+            try:
+                status_updated, netbox_vm = updates.virtual_machine.update_vm_role(netbox_vm, proxmox_json)
+                print(status_updated)
+            except Exception as e:
+                print(e)
+                vm_info_task.message = "{}==>{}".format(step, e.message)
+                vm_info_task.save()
             next_step = 'finish'
+
         if step == 'finish':
             print('FINISH ALL PROCESS')
             process_vm_info_args = [vm_info_task.task_id]
@@ -815,7 +859,7 @@ def get_vms_for_the_node(node_task_id, task_id, iteration=0):
             try:
                 # if counter > 5:
                 #    break
-                # if not (px_vm_each['name'] == 'E1-0.co.ntp.edgeuno.com'):
+                # if not (px_vm_each['name'] == 'E1'):
                 #     continue
                 print(px_vm_each)
                 is_template = px_vm_each.get("template")
