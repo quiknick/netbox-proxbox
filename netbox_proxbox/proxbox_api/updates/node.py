@@ -95,7 +95,7 @@ def interface_ip_assign(netbox_node, proxmox_json):
                 netbox_ip.assigned_object = node_interface
                 netbox_ip.save()
             except Exception as e:
-                print("Error: interface_ip_assign-update - {}".format(e.message))
+                print("Error: interface_ip_assign-update - {}".format(e))
                 print('')
                 print(e)
         # Associate the ip address to the vm
@@ -107,7 +107,7 @@ def interface_ip_assign(netbox_node, proxmox_json):
         netbox_node.save()
         return True
     except Exception as e:
-        print("Error: interface_ip_assign-all - {}".format(e.message))
+        print("Error: interface_ip_assign-all - {}".format(e))
         print(e)
         return False
 
@@ -169,7 +169,7 @@ def update_role(netbox_node, proxmox_session=None):
         netbox_node.save()
         return True
     except Exception as e:
-        print("Error: update_role - {}".format(e.message))
+        print("Error: update_role - {}".format(e))
         print(e)
         return False
 
@@ -190,6 +190,6 @@ def update_device_type(netbox_node):
 
         return False
     except Exception as e:
-        print("Error: update_device_type - {}".format(e.message))
+        print("Error: update_device_type - {}".format(e))
         print(e)
         return False

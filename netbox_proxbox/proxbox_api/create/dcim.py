@@ -83,7 +83,7 @@ def device_type():
             proxbox_device_types.manufacturer = manufacturer().id
             proxbox_device_types.save()
         except Exception as e:
-            print("Error: proxbox_device_types-device_type - {}".format(e.message))
+            print("Error: proxbox_device_types-device_type - {}".format(e))
             print(e)
         device_type = proxbox_device_types
 

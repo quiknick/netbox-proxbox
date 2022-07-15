@@ -26,7 +26,7 @@ def validate_custom_tag(name):
         it.group().lower().strip()
         has_string = True
     except Exception as e:
-        print("Error: validate_custom_tag - {}".format(e.message))
+        print("Error: validate_custom_tag - {}".format(e))
         print(e)
     return has_string
 
@@ -86,7 +86,7 @@ def base_tag(netbox_vm, other_tags=None):
                     tags.append(custom_tag)
                     sve_custom = True
             except Exception as e:
-                print("Error: base_tag-other_tags - {}".format(e.message))
+                print("Error: base_tag-other_tags - {}".format(e))
                 print(e)
 
     if sve_custom:

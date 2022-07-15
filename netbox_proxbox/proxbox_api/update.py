@@ -84,7 +84,7 @@ def node_full_update(proxmox, netbox_node, proxmox_json, proxmox_cluster, proxmo
 
         return changes
     except Exception as e:
-        print("Error: node_full_update - {}".format(e.message))
+        print("Error: node_full_update - {}".format(e))
         print(e)
         raise e
 
@@ -292,7 +292,7 @@ def virtual_machine(**kwargs):
     try:
         cluster = kwargs.get('cluster')
     except Exception as e:
-        print("Error: virtual_machine-cluster - {}".format(e.message))
+        print("Error: virtual_machine-cluster - {}".format(e))
         cluster = None
     if cluster is None:
         cluster = create.virtualization.cluster(proxmox)
@@ -446,7 +446,7 @@ def nodes(**kwargs):
 
         return json_node
     except Exception as e:
-        print("Error: nodes - {}".format(e.message))
+        print("Error: nodes - {}".format(e))
         print(e)
         return None
 
@@ -458,7 +458,7 @@ def run_process_in_thread(proxmox_session, key, result, index, **kwargs):
         output = process_all_in_session(proxmox_session, **kwargs)
         result[index] = output
     except Exception as e:
-        print("Error: run_process_in_thread - {}".format(e.message))
+        print("Error: run_process_in_thread - {}".format(e))
         message = "OS error: {0}".format(e)
         print(message)
         result[index] = {
@@ -496,7 +496,7 @@ def all(**kwargs):
                 output = process_all_in_session(session, **kwargs)
                 result.append(output)
             except Exception as e:
-                print("Error: update.all - {}".format(e.message))
+                print("Error: update.all - {}".format(e))
                 message = "OS error: {0}".format(e)
                 print(message)
                 output = {

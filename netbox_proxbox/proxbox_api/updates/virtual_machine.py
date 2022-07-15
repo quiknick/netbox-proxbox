@@ -385,9 +385,8 @@ def get_ip(test_str):
         print('[OK] Parse. -> {}'.format(ip))
         return ip
     except Exception as e:
-        print("Error: get_ip - {}".format(e.message))
+        print("Error: get_ip - {}".format(e))
         return None
-        pass
 
 
 def get_ipv6(test_str):
@@ -403,7 +402,7 @@ def get_ipv6(test_str):
         print('[OK] Parse. -> {}'.format(ip))
         return ip
     except Exception as e:
-        print("Error: get_ipv6 - {}".format(e.message))
+        print("Error: get_ipv6 - {}".format(e))
         return None
 
 
@@ -424,7 +423,7 @@ def get_main_ip(test_str):
             .strip()
         ipv4 = (re.sub(rgx, '', ipv4)).strip()
     except Exception as e:
-        print("Error: get_main_ip-ip4 - {}".format(e.message))
+        print("Error: get_main_ip-ip4 - {}".format(e))
         pass
     try:
         print('[OK] Parsing main ip for ipv6')
@@ -439,7 +438,7 @@ def get_main_ip(test_str):
             .strip()
         ipv6 = (re.sub(rgx, '', ipv6)).strip()
     except Exception as e:
-        print("Error: get_main_ip-ip6 - {}".format(e.message))
+        print("Error: get_main_ip-ip6 - {}".format(e))
         pass
     try:
         if ipv4 is None:
@@ -457,7 +456,7 @@ def get_main_ip(test_str):
                 .strip()
             ipv4 = (re.sub(rgx, '', ipv4)).strip()
     except Exception as e:
-        print("Error: get_main_ip-ip4-location - {}".format(e.message))
+        print("Error: get_main_ip-ip4-location - {}".format(e))
         pass
     try:
         if ipv6 is None:
@@ -475,7 +474,7 @@ def get_main_ip(test_str):
                 .strip()
             ipv6 = (re.sub(rgx, '', ipv6)).strip()
     except Exception as e:
-        print("Error: get_main_ip-ip6-allocation - {}".format(e.message))
+        print("Error: get_main_ip-ip6-allocation - {}".format(e))
         pass
     return ipv4, ipv6
 
@@ -567,7 +566,7 @@ def client_tenant_parser(test_str):
         try:
             m_result = re.finditer(sub_str_regex, client, re.MULTILINE | re.IGNORECASE).__next__().group().strip()
         except Exception as e:
-            print("Error: client_tenant_parser - {}".format(e.message))
+            print("Error: client_tenant_parser - {}".format(e))
             print(e)
             pass
         if m_result:
@@ -578,7 +577,7 @@ def client_tenant_parser(test_str):
             tenant_name = client
         print('[OK] Tenant parse. -> {}'.format(client))
     except Exception as e:
-        print("Error: client_tenant_parser-all - {}".format(e.message))
+        print("Error: client_tenant_parser-all - {}".format(e))
         pass
     return tenant_name, client
 
@@ -611,7 +610,7 @@ def contact_parse_set(test_str, name):
                 .strip()
             print('[OK] Contact email parsed. -> {}'.format(contact_email))
         except Exception as e:
-            print("Error: contact_parse_set - {}".format(e.message))
+            print("Error: contact_parse_set - {}".format(e))
             print(e)
         if contact_email is None:
             return None, None
@@ -628,7 +627,7 @@ def contact_parse_set(test_str, name):
             new_contact_role = {"name": "vm", "slug": slugify("vm")}
             contact_role = nb.tenancy.contact_roles.create(new_contact_role)
     except Exception as e:
-        print("Error: contact_parse_set - {}".format(e.message))
+        print("Error: contact_parse_set - {}".format(e))
         print(e)
 
     return contact, contact_role
@@ -643,7 +642,7 @@ def set_contact_to_vm(test_str, netbox_vm):
         set_assign_contact(test_str, client, netbox_vm.id, content_type)
         return netbox_vm
     except Exception as e:
-        print("Error: set_contact_to_vm - {}".format(e.message))
+        print("Error: set_contact_to_vm - {}".format(e))
         print(e)
         return netbox_vm
 
@@ -674,7 +673,7 @@ def set_assign_contact(test_str, name, object_id, content_type='tenancy.tenant')
             print('[OK] Contact assigned {} to tenant {}'.format(contact.name, name))
             # assign_contact_to_tenant(tenant, contact, contact_role, content_type)
     except Exception as e:
-        print("Error: set_assign_contact - {}".format(e.message))
+        print("Error: set_assign_contact - {}".format(e))
         print(e)
     return contact, contact_role, contact_assigment
 
@@ -776,11 +775,11 @@ def base_add_ip(proxmox, netbox_vm, proxmox_vm):
                     netbox_vm = set_ipv6(netbox_vm, vm_interface, ipv6)
                     netbox_vm = set_ipv4(netbox_vm, vm_interface, ipv4)
                 except Exception as e:
-                    print("Error: base_add_ip-3 - {}".format(e.message))
+                    print("Error: base_add_ip-3 - {}".format(e))
                     print(e)
                 netbox_vm.save()
     except Exception as e:
-        print("Error: base_add_ip-4 - {}".format(e.message))
+        print("Error: base_add_ip-4 - {}".format(e))
         print(e)
     return True, netbox_vm
 
@@ -799,7 +798,7 @@ def default_tenant(netbox_vm):
         it.group().lower().strip()
         has_string = True
     except Exception as e:
-        print("Error: default_tenant-1 - {}".format(e.message))
+        print("Error: default_tenant-1 - {}".format(e))
         print(e)
     if has_string:
         if NETBOX_TENANT_NAME is not None:
@@ -825,7 +824,7 @@ def base_add_configuration(proxmox, netbox_vm, proxmox_vm):
         if NETBOX_TENANT_NAME is not None:
             netbox_vm = default_tenant(netbox_vm)
     except Exception as e:
-        print("Error: base_add_configuration-1 - {}".format(e.message))
+        print("Error: base_add_configuration-1 - {}".format(e))
         print(e)
     try:
         if vm_type == 'qemu':
@@ -835,7 +834,7 @@ def base_add_configuration(proxmox, netbox_vm, proxmox_vm):
             config = proxmox.nodes(node).lxc(vmid).config.get()
             print('[OK] Got Configuration for lxc. -> {}'.format(vmid))
     except Exception as e:
-        print("Error: base_add_configuration-2 - {}".format(e.message))
+        print("Error: base_add_configuration-2 - {}".format(e))
         print(e)
         config = None
 
@@ -849,6 +848,6 @@ def base_add_configuration(proxmox, netbox_vm, proxmox_vm):
         else:
             print('no description')
     except Exception as e:
-        print("Error: base_add_configuration-3 - {}".format(e.message))
+        print("Error: base_add_configuration-3 - {}".format(e))
         print(e)
     return True, netbox_vm
