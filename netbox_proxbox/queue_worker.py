@@ -881,9 +881,9 @@ def get_vms_for_the_node(node_task_id, task_id, iteration=0):
             try:
                 # if counter > 5:
                 #    break
-                if not (px_vm_each['name'] == 'ATRO-001-BOG' or px_vm_each['name'] == 'E1-0.co.ntp.edgeuno.com' or
-                        px_vm_each['name'] == 'colombiabridge'):
-                    continue
+                # if not (px_vm_each['name'] == 'ATRO-001-BOG' or px_vm_each['name'] == 'E1-0.co.ntp.edgeuno.com' or
+                #         px_vm_each['name'] == 'colombiabridge'):
+                #     continue
                 print(px_vm_each)
                 is_template = px_vm_each.get("template")
                 if is_template == 1:
