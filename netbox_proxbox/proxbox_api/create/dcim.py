@@ -73,15 +73,17 @@ def device_type():
                 tags=[extras.tag().id]
             )
         except:
-            return "Error creating the '{0}' device type. Possible errors: the model '{0}' or slug '{1}' is already used.".format(
+            msg = "Error creating the '{0}' device type. Possible errors: the model '{0}' or slug '{1}' is already used.".format(
                 proxbox_device_type_model, proxbox_device_type_slug)
+            print(msg)
+            return msg
 
     else:
         try:
             proxbox_device_types.manufacturer = manufacturer().id
             proxbox_device_types.save()
         except Exception as e:
-            print('proxbox_device_types-updated')
+            print("Error: proxbox_device_types-device_type - {}".format(e))
             print(e)
         device_type = proxbox_device_types
 

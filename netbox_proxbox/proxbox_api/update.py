@@ -84,6 +84,7 @@ def node_full_update(proxmox, netbox_node, proxmox_json, proxmox_cluster, proxmo
 
         return changes
     except Exception as e:
+        print("Error: node_full_update - {}".format(e))
         print(e)
         raise e
 
@@ -291,6 +292,7 @@ def virtual_machine(**kwargs):
     try:
         cluster = kwargs.get('cluster')
     except Exception as e:
+        print("Error: virtual_machine-cluster - {}".format(e))
         cluster = None
     if cluster is None:
         cluster = create.virtualization.cluster(proxmox)
@@ -369,10 +371,12 @@ def virtual_machine(**kwargs):
 
 
 def find_node_by_ip(ip):
-    current_ip = nb.ipam.ip_addresses.get(address=ip)
-    if current_ip and current_ip.assigned_object and current_ip.assigned_object.device:
-        device = current_ip.assigned_object.device
-        return device
+    current_ips = nb.ipam.ip_addresses.filter(address=ip)
+    if len(current_ips) > 0:
+        for current_ip in current_ips:
+            if current_ip and current_ip.assigned_object and current_ip.assigned_object.device:
+                device = current_ip.assigned_object.device
+                return device
 
 
 def nodes(**kwargs):
@@ -392,6 +396,7 @@ def nodes(**kwargs):
         if node_ip:
             netbox_search = find_node_by_ip(node_ip)
         if netbox_search is None:
+            # netbox_search = nb.dcim.devices.filter(name=proxmox_node_name).first()
             netbox_search = nb.dcim.devices.get(name=proxmox_node_name)
 
         # Search node on Netbox with Proxmox node name gotten
@@ -444,6 +449,7 @@ def nodes(**kwargs):
 
         return json_node
     except Exception as e:
+        print("Error: nodes - {}".format(e))
         print(e)
         return None
 
@@ -455,6 +461,7 @@ def run_process_in_thread(proxmox_session, key, result, index, **kwargs):
         output = process_all_in_session(proxmox_session, **kwargs)
         result[index] = output
     except Exception as e:
+        print("Error: run_process_in_thread - {}".format(e))
         message = "OS error: {0}".format(e)
         print(message)
         result[index] = {
@@ -492,6 +499,7 @@ def all(**kwargs):
                 output = process_all_in_session(session, **kwargs)
                 result.append(output)
             except Exception as e:
+                print("Error: update.all - {}".format(e))
                 message = "OS error: {0}".format(e)
                 print(message)
                 output = {

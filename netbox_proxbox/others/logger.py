@@ -22,6 +22,7 @@ try:
     file.touch(exist_ok=True)
     file = open(NETBOX_PROXBOX_LOG_FILE, 'r')
 except Exception as e:
+    print("Error: logger-path - {}".format(e))
     file = open(NETBOX_PROXBOX_LOG_FILE, 'w')
 
 
