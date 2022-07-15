@@ -371,10 +371,12 @@ def virtual_machine(**kwargs):
 
 
 def find_node_by_ip(ip):
-    current_ip = nb.ipam.ip_addresses.get(address=ip)
-    if current_ip and current_ip.assigned_object and current_ip.assigned_object.device:
-        device = current_ip.assigned_object.device
-        return device
+    current_ips = nb.ipam.ip_addresses.filter(address=ip)
+    if len(current_ips) > 0:
+        for current_ip in current_ips:
+            if current_ip and current_ip.assigned_object and current_ip.assigned_object.device:
+                device = current_ip.assigned_object.device
+                return device
 
 
 def nodes(**kwargs):
