@@ -980,6 +980,8 @@ def get_nodes_for_the_cluster(cluster_data_id, task_id, iteration=0):
 
         for px_node_each in proxmox_nodes:
             try:
+                print('Nodes...')
+                print(px_node_each)
                 node_updated = nodes(proxmox_json=px_node_each, proxmox_cluster=proxmox_cluster, proxmox=proxmox,
                                      proxmox_session=proxmox_session)
                 node_response_list.append(px_node_each)

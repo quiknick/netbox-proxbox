@@ -394,6 +394,7 @@ def nodes(**kwargs):
         if node_ip:
             netbox_search = find_node_by_ip(node_ip)
         if netbox_search is None:
+            # netbox_search = nb.dcim.devices.filter(name=proxmox_node_name).first()
             netbox_search = nb.dcim.devices.get(name=proxmox_node_name)
 
         # Search node on Netbox with Proxmox node name gotten
