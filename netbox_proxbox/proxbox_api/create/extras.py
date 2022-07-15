@@ -1,3 +1,5 @@
+from django.template.defaultfilters import slugify
+
 # PLUGIN_CONFIG variables
 from ..plugins_config import (
     NETBOX_SESSION as nb,
@@ -46,6 +48,16 @@ def role(**kwargs):
     role_name = kwargs.get('role_name', None)
     if role_name:
         role = nb.dcim.device_roles.get(name=role_name)
+        if role is None:
+            try:
+                role = nb.dcim.device_roles.create(
+                    name=role_name,
+                    slug=slugify(role_name),
+                    color='ff5722',
+                    vm_role=True
+                )
+            except:
+                role = None
         if role:
             return role
 

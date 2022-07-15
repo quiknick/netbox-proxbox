@@ -33,6 +33,7 @@ def get_session(domain):
             if domain == key:
                 session = proxmox_sessions[key]
         except Exception as e:
+            print("Error: get_session-1 - {}".format(e))
             message = "OS error: {0}".format(e)
             print(message)
     return session
@@ -84,6 +85,7 @@ def queue_next_sync(
             print('16. Save the task')
             sync_task.save()
     except Exception as e:
+        print("Error: queue_next_sync-1 - {}".format(e))
         print(e)
         raise e
     # Save the task
@@ -100,6 +102,7 @@ def queue_next_sync(
             sync_task.job_id = queue_job.id
             sync_task.save()
     except Exception as e:
+        print("Error: queue_next_sync-2 - {}".format(e))
         print(e)
         raise e
     print(f'17. Next task successfully queue with id: {queue_job.id}')
@@ -164,6 +167,7 @@ def get_or_create_sync_job(
             print(f'24. Trying to the get the sync job with id: {task_id}')
             sync_job = SyncTask.objects.get(task_id=task_id)
     except Exception as e:
+        print("Error: get_or_create_sync_job-1 - {}".format(e))
         print(e)
         sync_job = None
 
@@ -228,6 +232,7 @@ def should_delay_job_run(
         else:
             return False
     except Exception as e:
+        print("Error: should_delay_job_run-1 - {}".format(e))
         return True
     return True
 
@@ -278,6 +283,7 @@ def get_process_vm(vm_info_task_id):
         vm_info_task = SyncTask.objects.get(task_id=vm_info_task_id)
         return vm_info_task
     except Exception as e:
+        print("Error: get_process_vm-1 - {}".format(e))
         raise e
 
 
@@ -449,6 +455,7 @@ def remove_unused_step2(id, nb_vm_each):
         return json_vm
         # json_vm_all.append(json_vm)
     except Exception as e:
+        print("Error: remove_unused_step2-1 - {}".format(e))
         print(e)
         remove_task_step2.done = True
         remove_task_step2.status = TaskStatusChoices.STATUS_FAILED
@@ -484,6 +491,7 @@ def remove_unused_step1(id):
 
         return json_vm_all
     except Exception as e:
+        print("Error: remove_unused_step1-1 - {}".format(e))
         print(e)
         remove_task.done = True
         remove_task.status = TaskStatusChoices.STATUS_FAILED
@@ -573,6 +581,7 @@ def clean_left(id):
             queue_next_sync(children_task, clean_left, current_queue_args, 'clean_left',
                             TaskStatusChoices.STATUS_SUCCEEDED)
     except Exception as e:
+        print("Error: clean_left-1 - {}".format(e))
         print(e)
         children_task.done = True
         children_task.status = TaskStatusChoices.STATUS_FAILED
@@ -613,9 +622,15 @@ def update_vm_process(vm_info_task_id, cluster=None, netbox_vm=None, step='finis
 
         print(f'***>SELECTING OPTION FOR: {step}<***')
         if step == 'status':
-            print("===>Update 'status' field, if necessary.")
-            status_updated, netbox_vm = updates.virtual_machine.base_status(netbox_vm, proxmox_json)
-            print(status_updated)
+            try:
+                print("===>Update 'status' field, if necessary.")
+                status_updated, netbox_vm = updates.virtual_machine.base_status(netbox_vm, proxmox_json)
+                print(status_updated)
+            except Exception as e:
+                print("Error: update_vm_process-status - {}".format(e))
+                print(e)
+                vm_info_task.message = "{}==>{}".format(step, e)
+                vm_info_task.save()
             next_step = 'tags'
         elif step == 'tags':
             print("===>Update tags")
@@ -624,42 +639,88 @@ def update_vm_process(vm_info_task_id, cluster=None, netbox_vm=None, step='finis
                 tag_updated, netbox_vm = updates.extras.base_tag(netbox_vm)
                 print(tag_updated)
             except Exception as e:
+                print("Error: update_vm_process-tags - {}".format(e))
                 print(e)
+                vm_info_task.message = "{}==>{}".format(step, e)
+                vm_info_task.save()
                 # raise e
             next_step = 'custom_fields'
         elif step == 'custom_fields':
             # Update 'local_context_data' json, if necessary.
-            print("===>Update 'custom_fields' field, if necessary.")
-            custom_fields_updated, netbox_vm = updates.virtual_machine.base_custom_fields(netbox_vm, proxmox_json)
-            netbox_vm = get_nb_by_(cluster.name, vmid, node, proxmox_vm_name)
-            print(custom_fields_updated)
+            try:
+                print("===>Update 'custom_fields' field, if necessary.")
+                custom_fields_updated, netbox_vm = updates.virtual_machine.base_custom_fields(netbox_vm, proxmox_json)
+                netbox_vm = get_nb_by_(cluster.name, vmid, node, proxmox_vm_name)
+                print(custom_fields_updated)
+            except Exception as e:
+                print("Error: update_vm_process-custom_fields - {}".format(e))
+                print(e)
+                vm_info_task.message = "{}==>{}".format(step, e)
+                vm_info_task.save()
             next_step = 'local_context'
         elif step == 'local_context':
             # Update 'local_context_data' json, if necessary.
             print("===>Update 'local_context_data' json, if necessary.")
-            PROXMOX = proxmox_session.get('PROXMOX')
-            PROXMOX_PORT = proxmox_session.get('PROXMOX_PORT')
-            local_context_updated, netbox_vm = updates.virtual_machine.base_local_context_data(netbox_vm, proxmox_json,
-                                                                                               PROXMOX,
-                                                                                               PROXMOX_PORT)
-            print(local_context_updated)
+            try:
+                PROXMOX = proxmox_session.get('PROXMOX')
+                PROXMOX_PORT = proxmox_session.get('PROXMOX_PORT')
+                local_context_updated, netbox_vm = updates.virtual_machine.base_local_context_data(netbox_vm,
+                                                                                                   proxmox_json,
+                                                                                                   PROXMOX,
+                                                                                                   PROXMOX_PORT)
+                print(local_context_updated)
+            except Exception as e:
+                print("Error: update_vm_process-local_context - {}".format(e))
+                print(e)
+                vm_info_task.message = "{}==>{}".format(step, e)
+                vm_info_task.save()
             next_step = 'resources'
         elif step == 'resources':
             # Update 'resources', like CPU, Memory and Disk, if necessary.
-            print("===>Update 'resources', like CPU, Memory and Disk, if necessary.")
-            resources_updated, netbox_vm = updates.virtual_machine.base_resources(netbox_vm, proxmox_json)
-            print(resources_updated)
+            try:
+                print("===>Update 'resources', like CPU, Memory and Disk, if necessary.")
+                resources_updated, netbox_vm = updates.virtual_machine.base_resources(netbox_vm, proxmox_json)
+                print(resources_updated)
+            except Exception as e:
+                print("Error: update_vm_process-resources - {}".format(e))
+                print(e)
+                vm_info_task.message = "{}==>{}".format(step, e)
+                vm_info_task.save()
             next_step = 'add_ip'
         elif step == 'add_ip':
             print("===>Update ips")
-            ip_update, netbox_vm = updates.virtual_machine.base_add_ip(proxmox, netbox_vm, proxmox_json)
-            print(ip_update)
+            try:
+                ip_update, netbox_vm = updates.virtual_machine.base_add_ip(proxmox, netbox_vm, proxmox_json)
+                print(ip_update)
+            except Exception as e:
+                print("Error: update_vm_process-add_ip - {}".format(e))
+                print(e)
+                vm_info_task.message = "{}==>{}".format(step, e)
+                vm_info_task.save()
             next_step = 'add_config'
         elif step == 'add_config':
             print("===>Update configuration")
-            ip_update, netbox_vm = updates.virtual_machine.base_add_configuration(proxmox, netbox_vm, proxmox_json)
-            print(ip_update)
+            try:
+                ip_update, netbox_vm = updates.virtual_machine.base_add_configuration(proxmox, netbox_vm, proxmox_json)
+                print(ip_update)
+            except Exception as e:
+                print("Error: update_vm_process-add_config - {}".format(e))
+                print(e)
+                vm_info_task.message = "{}==>{}".format(step, e)
+                vm_info_task.save()
+            next_step = 'type_role'
+        elif step == 'type_role':
+            print("===>Update 'type_role' field, if necessary.")
+            try:
+                status_updated, netbox_vm = updates.virtual_machine.update_vm_role(netbox_vm, proxmox_json)
+                print(status_updated)
+            except Exception as e:
+                print("Error: update_vm_process-type_role - {}".format(e))
+                print(e)
+                vm_info_task.message = "{}==>{}".format(step, e)
+                vm_info_task.save()
             next_step = 'finish'
+
         if step == 'finish':
             print('FINISH ALL PROCESS')
             process_vm_info_args = [vm_info_task.task_id]
@@ -673,6 +734,7 @@ def update_vm_process(vm_info_task_id, cluster=None, netbox_vm=None, step='finis
 
         print("FINISH update_vm_status_queue")
     except Exception as e:
+        print("Error: update_vm_process-all - {}".format(e))
         print(e)
         return "Error"
 
@@ -697,6 +759,7 @@ def process_vm_info2(vm_info_task_id, cluster=None):
         queue_next_sync(vm_info_task, update_vm_process, process_vm_info_args, 'update_vm_process')
 
     except Exception as e:
+        print("Error: update_vm_process-process_vm_info2 - {}".format(e))
         print(e)
         return "Error"
 
@@ -712,6 +775,7 @@ def process_vm_info(vm_task_id, proxmox_json, cluster=None, task_id=None):
     try:
         vm_task = SyncTask.objects.get(task_id=vm_task_id)
     except Exception as e:
+        print("Error: update_vm_process-process_vm_info-vm_task - {}".format(e))
         return 'Error'
     user = vm_task.user
     remove_unused = vm_task.remove_unused
@@ -755,6 +819,7 @@ def get_vms_for_the_node(node_task_id, task_id, iteration=0):
     try:
         node_task = SyncTask.objects.get(task_id=node_task_id)
     except Exception as e:
+        print("Error: update_vm_process-get_vms_for_the_node - {}".format(e))
         print(e)
         print('SYNC JOB NOT FOUND DELAYING IN ORDER TO WAIT FOR THE DATA BASE COMMIT')
         print(e)
@@ -786,6 +851,7 @@ def get_vms_for_the_node(node_task_id, task_id, iteration=0):
         proxmox_session = get_session(domain)
         proxmox = proxmox_session.get('PROXMOX_SESSION')
     except Exception as e:
+        print("Error: update_vm_process-get_vms_for_the_node-proxmox - {}".format(e))
         print(e)
 
     #
@@ -812,25 +878,32 @@ def get_vms_for_the_node(node_task_id, task_id, iteration=0):
         vm_task.save()
         # counter = 0
         for px_vm_each in node_vms_all:
-            # if counter > 5:
-            #    break
-            # if not (px_vm_each['name'] == 'mongodb.cloudapps.test'):
-            #     continue
-            print(px_vm_each)
-            is_template = px_vm_each.get("template")
-            if is_template == 1:
-                continue
-            process_vm_info_args = [
-                vm_task.task_id, px_vm_each, cluster, None
-            ]
+            try:
+                # if counter > 5:
+                #    break
+                # if not (px_vm_each['name'] == 'ATRO-001-BOG' or px_vm_each['name'] == 'E1-0.co.ntp.edgeuno.com' or
+                #         px_vm_each['name'] == 'colombiabridge'):
+                #     continue
+                # if not (px_vm_each['name'] == 'E1-kali-sofia'):
+                #     continue
+                print(px_vm_each)
+                is_template = px_vm_each.get("template")
+                if is_template == 1:
+                    continue
+                process_vm_info_args = [
+                    vm_task.task_id, px_vm_each, cluster, None
+                ]
 
-            print(f'34. Run the next function (process_vm_info for {domain}) ')
-            print(process_vm_info_args)
-            # counter = counter + 1
-            queue_next_sync(vm_task, process_vm_info, process_vm_info_args, 'process_vm_info')
+                print(f'34. Run the next function (process_vm_info for {domain}) ')
+                print(process_vm_info_args)
+                # counter = counter + 1
+                queue_next_sync(vm_task, process_vm_info, process_vm_info_args, 'process_vm_info')
 
-            # vm_updated = virtual_machine(proxmox_json=px_vm_each, proxmox_session=proxmox_session, cluster=cluster)
-            # virtualmachines_list.append(vm_updated)
+                # vm_updated = virtual_machine(proxmox_json=px_vm_each, proxmox_session=proxmox_session, cluster=cluster)
+                # virtualmachines_list.append(vm_updated)
+            except Exception as e:
+                print("Error: update_vm_process-px_vm_each-proxmox - {}".format(e))
+                print(e)
 
 
 @job(QUEUE_NAME)
@@ -845,6 +918,7 @@ def get_nodes_for_the_cluster(cluster_data_id, task_id, iteration=0):
     try:
         cluster_data = SyncTask.objects.get(task_id=cluster_data_id)
     except Exception as e:
+        print("Error: update_vm_process-get_nodes_for_the_cluster - {}".format(e))
         print(e)
         print('SYNC JOB NOT FOUND DELAYING IN ORDER TO WAIT FOR THE DATA BASE COMMIT')
         print(e)
@@ -901,15 +975,19 @@ def get_nodes_for_the_cluster(cluster_data_id, task_id, iteration=0):
             proxmox_session = get_session(domain)
             proxmox = proxmox_session.get('PROXMOX_SESSION')
         except Exception as e:
+            print("Error: update_vm_process-get_nodes_for_the_cluster-proxmox_session - {}".format(e))
             print(e)
 
         for px_node_each in proxmox_nodes:
             try:
+                print('Nodes...')
+                print(px_node_each)
                 node_updated = nodes(proxmox_json=px_node_each, proxmox_cluster=proxmox_cluster, proxmox=proxmox,
                                      proxmox_session=proxmox_session)
                 node_response_list.append(px_node_each)
                 print(px_node_each)
             except Exception as e:
+                print("Error: get_nodes_for_the_cluster-px_node_each {}".format(e))
                 message = "OS error: {0}".format(e)
                 print(message)
                 log.error(e)
@@ -940,6 +1018,7 @@ def get_cluster_data(cluster_task_id, domain, task_id, iteration=0):
         try:
             cluster_sync = SyncTask.objects.get(task_id=cluster_task_id)
         except Exception as e:
+            print("Error: get_cluster_data-cluster {}".format(e))
             print(e)
             print('SYNC JOB NOT FOUND DELAYING IN ORDER TO WAIT FOR THE DATA BASE COMMIT')
             print(e)
@@ -1008,6 +1087,7 @@ def get_cluster_data(cluster_task_id, domain, task_id, iteration=0):
         return f'Finish...'
 
     except Exception as e:
+        print("Error: get_cluster_data-cluster-all {}".format(e))
         print(e)
         return f'Error'
 
@@ -1025,6 +1105,7 @@ def start_cluster_sync(sync_job_id, task_id, iteration=0):
         try:
             sync_job = SyncTask.objects.get(task_id=sync_job_id)
         except Exception as e:
+            print("Error: start_cluster_sync-sync_job {}".format(e))
             print('SYNC JOB NOT FOUN DELAYING IN ORDER TO WAIT FOR THE DATA BASE COMMIT')
             print(e)
             iteration = iteration + 1
@@ -1074,11 +1155,13 @@ def start_cluster_sync(sync_job_id, task_id, iteration=0):
                     print(f'21. Run the next function (get_cluster_data for {domain}) ')
                     queue_next_sync(cluster_sync, get_cluster_data, get_cluster_data_args, 'get_cluster_data')
                 except Exception as e:
+                    print("Error: start_cluster_sync-proxmox_sessions {}".format(e))
                     message = "OS error: {0}".format(e)
                     print(message)
                     log.error(e)
             return f'Finish:{cluster_sync.name}:{cluster_sync.task_id}'
     except Exception as e:
+        print("Error: start_cluster_sync-all-1 {}".format(e))
         print(e)
         return f'Error'
 

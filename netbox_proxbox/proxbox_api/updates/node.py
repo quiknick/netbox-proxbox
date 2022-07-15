@@ -2,7 +2,9 @@ from dcim.choices import InterfaceTypeChoices
 
 from .. import (
     create,
+
 )
+
 from ..plugins_config import (
     # PROXMOX,
     # PROXMOX_PORT,
@@ -14,6 +16,7 @@ from ..plugins_config import (
     # PROXMOX_SESSION as proxmox,
     PROXMOX_SESSIONS as proxmox_sessions,
     NETBOX_SESSION as nb,
+    NETBOX_MANUFACTURER,
 )
 
 
@@ -76,7 +79,13 @@ def interface_ip_assign(netbox_node, proxmox_json):
     ip = proxmox_json.get("ip", None)
     try:
         node_interface = get_set_interface('Bond0', netbox_node)
-        netbox_ip = nb.ipam.ip_addresses.get(address=ip)
+        # netbox_ip = nb.ipam.ip_addresses.get(address=ip)
+        netbox_ips = nb.ipam.ip_addresses.filter(address=ip)
+        netbox_ip = None
+        if len(netbox_ips) > 0:
+            for current_ip in netbox_ips:
+                netbox_ip = current_ip
+                break
         if netbox_ip is None:
             # Create the ip address and link it to the interface previously created
             address = {
@@ -92,6 +101,8 @@ def interface_ip_assign(netbox_node, proxmox_json):
                 netbox_ip.assigned_object = node_interface
                 netbox_ip.save()
             except Exception as e:
+                print("Error: interface_ip_assign-update - {}".format(e))
+                print('')
                 print(e)
         # Associate the ip address to the vm
         netbox_node.primary_ip = netbox_ip
@@ -102,6 +113,7 @@ def interface_ip_assign(netbox_node, proxmox_json):
         netbox_node.save()
         return True
     except Exception as e:
+        print("Error: interface_ip_assign-all - {}".format(e))
         print(e)
         return False
 
@@ -113,12 +125,15 @@ def cluster(proxmox, netbox_node, proxmox_node, proxmox_cluster):
     #
     if proxmox_cluster != None:
         # If cluster is filled, but different from actual cluster, update it.
-        if netbox_node.cluster.name != proxmox_cluster['name']:
+        proxmox_cluster_name = proxmox_cluster['name']
+        if netbox_node.cluster is None or netbox_node.cluster.name != proxmox_cluster_name:
             # Search for Proxmox Cluster using create.cluster() function
-            cluster_id = create.virtualization.cluster(proxmox).id
+            netbox_cluster = create.virtualization.cluster(proxmox)
+            cluster_id = netbox_cluster.id
 
             # Use Cluster ID to update NODE information
-            netbox_node.cluster.id = cluster_id
+            netbox_node.cluster_id = cluster_id
+            netbox_node.cluster = netbox_cluster
 
             if netbox_node.save() == True:
                 cluster_updated = True
@@ -146,3 +161,41 @@ def cluster(proxmox, netbox_node, proxmox_node, proxmox_cluster):
         cluster_updated = False
 
     return cluster_updated
+
+
+def update_role(netbox_node, proxmox_session=None):
+    try:
+        role_name = None
+        if proxmox_session:
+            role_id = proxmox_session.get('NETBOX_NODE_ROLE_ID', None)
+            role_name = proxmox_session.get('NETBOX_NODE_ROLE_NAME', role_name)
+        # Create json with basic NODE information
+
+        netbox_node.device_role = create.extras.role(role_id=role_id, role_name=role_name).id
+        netbox_node.save()
+        return True
+    except Exception as e:
+        print("Error: update_role - {}".format(e))
+        print(e)
+        return False
+
+
+def update_device_type(netbox_node):
+    try:
+        device_type = netbox_node.device_type
+        if device_type:
+            manufacturer = device_type.manufacturer
+            if manufacturer:
+                if manufacturer.name.lower() == 'proxbox basic manufacturer':
+                    default_manufacturer = nb.dcim.manufacturers.get(name=NETBOX_MANUFACTURER)
+                    if default_manufacturer:
+                        device_type.manufacturer = default_manufacturer
+                        device_type.manufacturer_id = default_manufacturer.id
+                        device_type.save()
+                        return True
+
+        return False
+    except Exception as e:
+        print("Error: update_device_type - {}".format(e))
+        print(e)
+        return False

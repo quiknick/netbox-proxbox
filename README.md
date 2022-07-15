@@ -160,8 +160,12 @@ PLUGINS_CONFIG = {
             'ssl': False,  # There is no support to SSL on Netbox yet, so let it always False.
             'settings': {
                 'virtualmachine_role_id': 0,
+                'virtualmachine_role_name': 'Proxbox Basic Role',
                 'node_role_id': 0,
-                'site_id': 0
+                'site_id': 0,
+                'tenant_name': 'EdgeUno',  # Set the custom tags and tenant for own machines
+                'tenant_regex_validator': '.*', # Set a regex for matching the name of the machines to give then the tenat and tag
+                'tenant_description': 'The vm belongs to Edgeuno'  # A description of the tenant and the tag
             }
         }
     }
@@ -185,23 +189,41 @@ Restart the WSGI service to load the new plugin:
 
 ### 1.6. Queue Initialization
 
+#### Queue File: **rq.sh:** 
+In the root of the repository there is a shell script that can initialize 5 queues and one scheduler, 
+is recommended to use screen for running the queues in the background
+
+```shell
+(venv) $ screen -S proxbox_queues
+(venv) $ cd /opt/netbox/plugins/netbox-proxbox
+(venv) $ sh rq.sh
+```
+To detach the screen just press ``ctrl+a+d``
+
+
+#### Individual Queues
 To run the synchronization some queue workers are needed
+
 ```shell
 (venv) $ /opt/netbox/venv/bin/python /opt/netbox/netbox/manage.py rqworker high default low netbox_proxbox.netbox_proxbox
 ```
+
 Initialize the scheduler
+
 ```shell
 (venv) $ /opt/netbox/venv/bin/python /opt/netbox/netbox/manage.py rqscheduler high default low netbox_proxbox.netbox_proxbox
 ```
+
 To make it work as a background process we recommend to use screen
 
 ```shell
-(venv) $ screen -s proxbox_queues
+(venv) $ screen -S proxbox_queues
 (venv) $ /opt/netbox/venv/bin/python /opt/netbox/netbox/manage.py rqworker high default low netbox_proxbox.netbox_proxbox &  /opt/netbox/venv/bin/python /opt/netbox/netbox/manage.py rqscheduler high default low netbox_proxbox.netbox_proxbox
 ```
-To close the screen just press `ctrl+a+d`
 
-**rq.sh:** in the root of the repository there is a shell script that can initialize 5 queues and one scheduler
+To detach the screen just press ``ctrl+a+d``
+
+ 
 
 ---
 
@@ -232,10 +254,16 @@ The following options are available:
 * `netbox.settings`: (Dict) Default items of Netbox to be used by Proxbox.
     - If not configured, Proxbox will automatically create a basic configuration to make it work.
     - The ID of each item can be easily found on the URL of the item you want to use.
+* `netbox.settings.manufacturer`: (String) Name of the manufacturer to use for default.
 * `netbox.settings.virtualmachine_role_id`: (Integer) Role ID to be used by Proxbox when creating Virtual
   Machines (`deprecated`).
+* `netbox.settings.virtualmachine_role_name`: (String) Name of the default role for the virtual machines (Is the machine
+  is quemu the role will be VPS, if the machine is lxc the role will be LXC, otherwise the default role will be used).
 * `netbox.settings.node_role_id`: (Integer) Role ID to be used by Proxbox when creating Nodes (Devices)(`deprecated`).
-* `netbox.settings.site_id` (Integer) Site ID to be used by Proxbox when creating Nodes (Devices)(`deprecated`).
+* `netbox.settings.site_id`: (Integer) Site ID to be used by Proxbox when creating Nodes (Devices)(`deprecated`).
+* `netbox.settings.tenant_name`: (String) Set the custom tags and tenant for own machines.
+* `netbox.settings.tenant_regex_validator`: (String) Set a regex for matching the name of the machines to give then the
+  tenat and tag.
 
 ---
 
@@ -306,13 +334,14 @@ Optional values (may be different)
 If everything is working correctly, you should see in Netbox's navigation the **Proxmox VM/CT** button in **Plugins**
 dropdown list.
 
-~~On **Proxmox VM/CT** page, click button ![full update button](etc/img/proxbox_full_update_button.png?raw=true "preview")~~
+~~On **Proxmox VM/CT** page, click
+button ![full update button](etc/img/proxbox_full_update_button.png?raw=true "preview")~~
 
 ~~It will redirect you to a new page and you just have to wait until the plugin runs through all Proxmox Cluster and
 create the VMs and CTs in Netbox.~~
 
 **OBS:** ~~Due the time it takes to full update the information, your web browser might show a timeout page (like HTTP
-Code 504) even though it actually worked.~~ 
+Code 504) even though it actually worked.~~
 
 In order to
 start the process a call to [http://{my.netbox.instance}/plugins/proxbox/queue/]() is needed. In future versions there
