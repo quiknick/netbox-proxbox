@@ -495,7 +495,7 @@ def set_ipv4(netbox_vm, vm_interface, ipv4):
             # netbox_vm.save()
         else:
             id = netbox_vm.primary_ip4.id
-            current_ip = nb.ipam.ip_addresses.get(id=id)
+            current_ip = nb.ipam.ip_addresses.filter(id=id).first()
             current_ip.address = ipv4
             current_ip.save()
             netbox_vm.primary_ip = current_ip
@@ -520,7 +520,7 @@ def set_ipv6(netbox_vm, vm_interface, ipv6):
             # netbox_vm.save()
         else:
             id = netbox_vm.primary_ip6.id
-            current_ip = nb.ipam.ip_addresses.get(id=id)
+            current_ip = nb.ipam.ip_addresses.filter(id=id).first()
             current_ip.address = ipv6
             current_ip.save()
             if netbox_vm.primary_ip6 is None:
