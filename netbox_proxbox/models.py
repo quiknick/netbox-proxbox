@@ -155,9 +155,9 @@ class SyncTask(ModelDiffMixin, ChangeLoggedModel):
     objects = RestrictedQuerySet.as_manager()
 
     def save(self, *args, **kwargs):
-        if 'message' in self.diff or self._state.adding:
-            if self.log is None or self.log == '':
-                self.log = self.message + '\n'
-            else:
-                self.log += self.message + '\n'
+        # if 'message' in self.diff or self._state.adding:
+        #     if self.log is None or self.log == '':
+        #         self.log = self.message + '\n'
+        #     else:
+        #         self.log += self.message + '\n'
         super(SyncTask, self).save(*args, **kwargs)
