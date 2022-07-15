@@ -62,18 +62,24 @@ def vm_full_update(proxmox_session, netbox_vm, proxmox_vm):
     return changes
 
 
-def node_full_update(proxmox, netbox_node, proxmox_json, proxmox_cluster):
+def node_full_update(proxmox, netbox_node, proxmox_json, proxmox_cluster, proxmox_session=None):
     try:
         changes = {}
 
         status_updated = updates.node.status(netbox_node, proxmox_json)
         cluster_updated = updates.node.cluster(proxmox, netbox_node, proxmox_json, proxmox_cluster)
         ip_updated = updates.node.interface_ip_assign(netbox_node, proxmox_json)
+        if proxmox_session:
+            role_updated = updates.node.update_role(netbox_node, proxmox_session)
+
+        device_type_updated = updates.node.update_device_type(netbox_node)
 
         changes = {
             "status": status_updated,
             "cluster": cluster_updated,
-            "ip": ip_updated
+            "ip": ip_updated,
+            "role": False if role_updated is None else role_updated,
+            "device_type_updated": device_type_updated
         }
 
         return changes
@@ -398,7 +404,7 @@ def nodes(**kwargs):
                 print("[OK] Node created! -> {}".format(proxmox_node_name))
 
                 # Update rest of configuration
-                full_update = node_full_update(proxmox, netbox_node, proxmox_json, proxmox_cluster)
+                full_update = node_full_update(proxmox, netbox_node, proxmox_json, proxmox_cluster, proxmox_session)
                 json_node["changes"] = full_update
 
                 full_update_list = list(full_update.values())
@@ -422,7 +428,7 @@ def nodes(**kwargs):
             netbox_node = netbox_search
 
             # Update Netbox node information, if necessary.
-            full_update = node_full_update(proxmox, netbox_node, proxmox_json, proxmox_cluster)
+            full_update = node_full_update(proxmox, netbox_node, proxmox_json, proxmox_cluster, proxmox_session)
             json_node["changes"] = full_update
 
             full_update_list = list(full_update.values())

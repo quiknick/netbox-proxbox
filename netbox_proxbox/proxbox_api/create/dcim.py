@@ -5,6 +5,7 @@ from ..plugins_config import (
     NETBOX_SESSION as nb,
     NETBOX_NODE_ROLE_ID,
     NETBOX_SITE_ID,
+    NETBOX_MANUFACTURER
 )
 
 from . import (
@@ -22,15 +23,12 @@ def manufacturer():
     # proxbox_manufacturer_slug = 'proxbox-manufacturer'
     # proxbox_manufacturer_desc = 'Manufacturer Proxbox will use if none is configured by user in PLUGINS_CONFIG'
 
-    proxbox_manufacturer_name = 'Dell'
+    proxbox_manufacturer_name = NETBOX_MANUFACTURER
     proxbox_manufacturer_slug = slugify(proxbox_manufacturer_name)
     proxbox_manufacturer_desc = 'Manufacturer Proxbox will use if none is configured by user in PLUGINS_CONFIG'
 
     # Check if Proxbox manufacturer already exists.
-    proxbox_manufacturer = nb.dcim.manufacturers.get(
-        name=proxbox_manufacturer_name,
-        slug=proxbox_manufacturer_slug,
-    )
+    proxbox_manufacturer = nb.dcim.manufacturers.get(name=proxbox_manufacturer_name)
 
     if proxbox_manufacturer == None:
         try:
@@ -79,7 +77,12 @@ def device_type():
                 proxbox_device_type_model, proxbox_device_type_slug)
 
     else:
-
+        try:
+            proxbox_device_types.manufacturer = manufacturer().id
+            proxbox_device_types.save()
+        except Exception as e:
+            print('proxbox_device_types-updated')
+            print(e)
         device_type = proxbox_device_types
 
     return device_type

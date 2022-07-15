@@ -254,6 +254,7 @@ The following options are available:
 * `netbox.settings`: (Dict) Default items of Netbox to be used by Proxbox.
     - If not configured, Proxbox will automatically create a basic configuration to make it work.
     - The ID of each item can be easily found on the URL of the item you want to use.
+* `netbox.settings.manufacturer`: (String) Name of the manufacturer to use for default.
 * `netbox.settings.virtualmachine_role_id`: (Integer) Role ID to be used by Proxbox when creating Virtual
   Machines (`deprecated`).
 * `netbox.settings.virtualmachine_role_name`: (String) Name of the default role for the virtual machines (Is the machine

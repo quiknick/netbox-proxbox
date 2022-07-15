@@ -2,7 +2,9 @@ from dcim.choices import InterfaceTypeChoices
 
 from .. import (
     create,
+
 )
+
 from ..plugins_config import (
     # PROXMOX,
     # PROXMOX_PORT,
@@ -14,6 +16,7 @@ from ..plugins_config import (
     # PROXMOX_SESSION as proxmox,
     PROXMOX_SESSIONS as proxmox_sessions,
     NETBOX_SESSION as nb,
+    NETBOX_MANUFACTURER,
 )
 
 
@@ -149,3 +152,39 @@ def cluster(proxmox, netbox_node, proxmox_node, proxmox_cluster):
         cluster_updated = False
 
     return cluster_updated
+
+
+def update_role(netbox_node, proxmox_session=None):
+    try:
+        role_name = None
+        if proxmox_session:
+            role_id = proxmox_session.get('NETBOX_NODE_ROLE_ID', None)
+            role_name = proxmox_session.get('NETBOX_NODE_ROLE_NAME', role_name)
+        # Create json with basic NODE information
+
+        netbox_node.device_role = create.extras.role(role_id=role_id, role_name=role_name).id
+        netbox_node.save()
+        return True
+    except Exception as e:
+        print(e)
+        return False
+
+
+def update_device_type(netbox_node):
+    try:
+        device_type = netbox_node.device_type
+        if device_type:
+            manufacturer = device_type.manufacturer
+            if manufacturer:
+                if manufacturer.name.lower() == 'proxbox basic manufacturer':
+                    default_manufacturer = nb.dcim.manufacturers.get(name=NETBOX_MANUFACTURER)
+                    if default_manufacturer:
+                        device_type.manufacturer = default_manufacturer
+                        device_type.manufacturer_id = default_manufacturer.id
+                        device_type.save()
+                        return True
+
+        return False
+    except Exception as e:
+        print(e)
+        return False
