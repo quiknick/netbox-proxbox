@@ -79,7 +79,13 @@ def interface_ip_assign(netbox_node, proxmox_json):
     ip = proxmox_json.get("ip", None)
     try:
         node_interface = get_set_interface('Bond0', netbox_node)
-        netbox_ip = nb.ipam.ip_addresses.get(address=ip)
+        # netbox_ip = nb.ipam.ip_addresses.get(address=ip)
+        netbox_ips = nb.ipam.ip_addresses.filter(address=ip)
+        netbox_ip = None
+        if len(netbox_ips) > 0:
+            for current_ip in netbox_ips:
+                netbox_ip = current_ip
+                break
         if netbox_ip is None:
             # Create the ip address and link it to the interface previously created
             address = {
