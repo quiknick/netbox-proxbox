@@ -567,11 +567,11 @@ def clean_left(id):
         if children_task.done:
             clear_children(children_task)
             return
-        if children_task.task_type == TaskTypeChoices.GET_CLUSTER_DATA:
-            if children_task.remove_unused:
-                if children_task.finish_remove_unused == RemoveStatusChoices.NOT_STARTED:
-                    clear_cluster_vms(children_task)
-                    return
+        # if children_task.task_type == TaskTypeChoices.GET_CLUSTER_DATA:
+        #     if children_task.remove_unused:
+        #         if children_task.finish_remove_unused == RemoveStatusChoices.NOT_STARTED:
+        #             clear_cluster_vms(children_task)
+        #             return
 
         if children_task.parent_id is None:
             if not children_task.done:
