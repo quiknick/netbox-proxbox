@@ -562,16 +562,16 @@ def remove_unused_step1(id):
 def clean_left(id):
     print("\n\n***>Processing clean_left<***")
     children_task = SyncTask.objects.get(id=id)
-
     try:
         if children_task.done:
             clear_children(children_task)
             return
-        if children_task.task_type == TaskTypeChoices.GET_CLUSTER_DATA:
-            if children_task.remove_unused:
-                if children_task.finish_remove_unused == RemoveStatusChoices.NOT_STARTED:
-                    clear_cluster_vms(children_task)
-                    return
+        # TODO: There is and error getting the vm's for the cluster
+        # if children_task.task_type == TaskTypeChoices.GET_CLUSTER_DATA:
+        #     if children_task.remove_unused:
+        #         if children_task.finish_remove_unused == RemoveStatusChoices.NOT_STARTED:
+        #             clear_cluster_vms(children_task)
+        #             return
 
         if children_task.parent_id is None:
             if not children_task.done:
