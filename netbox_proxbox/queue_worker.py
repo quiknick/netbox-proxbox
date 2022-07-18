@@ -22,6 +22,7 @@ from .proxbox_api import (
     create,
     remove,
 )
+import uuid
 
 TIME_ZONE = os.environ.get("TIME_ZONE", "UTC")
 
@@ -98,9 +99,9 @@ def queue_next_sync(
                 args=next_queue_args,
             )
         )
-        if sync_task is not None:
-            sync_task.job_id = queue_job.id
-            sync_task.save()
+        # if sync_task is not None:
+        #     sync_task.job_id = queue_job.id
+        #     sync_task.save()
     except Exception as e:
         print("Error: queue_next_sync-2 - {}".format(e))
         print(e)
@@ -142,8 +143,8 @@ def delay_sync(
     #     func=schedule_function,
     #     args=schedule_args,
     # )
-    sync_task.job_id = schedule_job.id
-    sync_task.save()
+    # sync_task.job_id = schedule_job.id
+    # sync_task.save()
     print(f'13. Next task successfully queue with id: {schedule_job.id}')
 
     return sync_task
@@ -373,6 +374,60 @@ def set_vm(vm_info_task, cluster=None):
     return netbox_vm
 
 
+def clear_cluster_vms(children_task):
+    print("***>The cluster process is being Started<***")
+    remove_task = get_or_create_sync_job(None, children_task.user, children_task.remove_unused,
+                                         TaskTypeChoices.REMOVE_UNUSED)
+    remove_task.domain = children_task.domain
+    remove_task.done = False
+    remove_task.parent_id = children_task.id
+    remove_task.cluster_id = children_task.cluster_id
+    remove_task.name = "Remove vms for cluster step 1: " + str(children_task.cluster_id)
+    remove_task.save()
+    children_task.done = False
+    children_task.finish_remove_unused = RemoveStatusChoices.REMOVING
+    children_task.save()
+    current_queue_args = [
+        remove_task.id
+    ]
+
+    queue_next_sync(children_task, remove_unused_step1, current_queue_args, 'remove_unused_step1', None)
+    current_queue_args = [
+        id
+    ]
+    delay_sync(children_task, clean_left, current_queue_args, 1)
+
+
+def clear_children(children_task):
+    current_queue_args = [
+        children_task.parent_id
+    ]
+    queue_next_sync(children_task, clean_left, current_queue_args, 'clean_left',
+                    TaskStatusChoices.STATUS_SUCCEEDED)
+
+    all_finish = SyncTask.objects.filter(parent_id=children_task.parent_id, done=True)
+
+    for el in all_finish:
+        try:
+            el.delete()
+        except Exception as e:
+            print("Error: clean_left-2 - {}".format(e))
+
+
+def finish_sync(children_task):
+    children_task.done = True
+    children_task.status = TaskStatusChoices.STATUS_SUCCEEDED
+    children_task.save()
+    sync_task = get_or_create_sync_job(None, children_task.user, children_task.remove_unused)
+    if sync_task.job_id is None:
+        sync_task.job_id = uuid.uuid4()
+        sync_task.save()
+    current_queue_args = [
+        sync_task.task_id, children_task.user, children_task.remove_unused
+    ]
+    delay_sync(sync_task, start_sync, current_queue_args, 480)
+
+
 @job(QUEUE_NAME)
 def remove_unused_step2(id, nb_vm_each):
     remove_task_step2 = SyncTask.objects.get(id=id)
@@ -413,7 +468,8 @@ def remove_unused_step2(id, nb_vm_each):
                         #
                         # DELETE THE VM/CT
                         #
-                        delete_vm = netbox_obj.delete()
+                        # delete_vm = netbox_obj.delete()
+                        print("Delete vm not implemented")
 
                     else:
                         log_message = "[ERROR] VM will not be removed because the 'Proxbox' tag was not found. -> {}".format(
@@ -498,6 +554,8 @@ def remove_unused_step1(id):
         remove_task.fail_reason = e
         remove_task.message = e
         remove_task.save()
+        queue_next_sync(remove_task, clean_left, current_queue_args, 'clean_left',
+                        TaskStatusChoices.STATUS_SUCCEEDED)
 
 
 @job(QUEUE_NAME)
@@ -505,81 +563,51 @@ def clean_left(id):
     print("\n\n***>Processing clean_left<***")
     children_task = SyncTask.objects.get(id=id)
     try:
-        if children_task.task_type == TaskTypeChoices.GET_CLUSTER_DATA:
-            if children_task.remove_unused:
-                if children_task.finish_remove_unused == RemoveStatusChoices.NOT_STARTED:
-                    print("***>The cluster process is being Started<***")
-                    remove_task = get_or_create_sync_job(None, children_task.user, children_task.remove_unused,
-                                                         TaskTypeChoices.REMOVE_UNUSED)
-                    remove_task.domain = children_task.domain
-                    remove_task.done = False
-                    remove_task.parent_id = children_task.id
-                    remove_task.cluster_id = children_task.cluster_id
-                    remove_task.name = "Remove vms for cluster step 1: " + str(children_task.cluster_id)
-                    remove_task.save()
-                    children_task.done = False
-                    children_task.finish_remove_unused = RemoveStatusChoices.REMOVING
-                    children_task.save()
-                    current_queue_args = [
-                        remove_task.id
-                    ]
-
-                    queue_next_sync(children_task, remove_unused_step1, current_queue_args, 'remove_unused_step1', None)
-                    current_queue_args = [
-                        id
-                    ]
-                    delay_sync(children_task, clean_left, current_queue_args, 1)
-                    return
-                if children_task.finish_remove_unused == RemoveStatusChoices.REMOVING:
-                    print("***>The cluster process is being remove<***")
-                    current_queue_args = [
-                        id
-                    ]
-                    cluster_data = delay_sync(children_task, clean_left, current_queue_args, 1)
-                    return
-
-        # if children_task.done and children_task.parent_id is not None:
-        #     current_queue_args = [
-        #         children_task.parent_id
-        #     ]
-        #     queue_next_sync(children_task, clean_left, current_queue_args, 'clean_left',
-        #                     TaskStatusChoices.STATUS_SUCCEEDED)
-        #     return
+        if children_task.done:
+            clear_children(children_task)
+            return
+        # TODO: There is and error getting the vm's for the cluster
+        # if children_task.task_type == TaskTypeChoices.GET_CLUSTER_DATA:
+        #     if children_task.remove_unused:
+        #         if children_task.finish_remove_unused == RemoveStatusChoices.NOT_STARTED:
+        #             clear_cluster_vms(children_task)
+        #             return
 
         if children_task.parent_id is None:
             if not children_task.done:
-                children_task.done = True
-                children_task.status = TaskStatusChoices.STATUS_SUCCEEDED
-                children_task.save()
-                sync_task = get_or_create_sync_job(None, children_task.user, children_task.remove_unused)
-                current_queue_args = [
-                    sync_task.task_id, children_task.user, children_task.remove_unused
-                ]
-                delay_sync(sync_task, start_sync, current_queue_args, 360)
+                finish_sync(children_task)
             return
-
-        father_task = SyncTask.objects.get(id=children_task.parent_id)
-        all_children_count = SyncTask.objects.filter(parent_id=father_task.id, done=False).count()
-        if all_children_count > 0:
+        all_children = SyncTask.objects.filter(parent_id=children_task.id, done=False)
+        if len(all_children) > 0:
             print(f'48. All clusters have not being finish')
+
             current_queue_args = [
                 id
             ]
-            cluster_data = delay_sync(children_task, clean_left, current_queue_args, 1)
+            delay_sync(children_task, clean_left, current_queue_args, 1)
+
+            for elem in all_children:
+                try:
+                    if not elem.done and (not elem.task_type == TaskTypeChoices.REMOVE_UNUSED) and (
+                            not elem.task_type == TaskTypeChoices.REMOVE_UNUSED):
+                        current_queue_args = [
+                            elem.id
+                        ]
+                        queue_next_sync(children_task, clean_left, current_queue_args, 'clean_left',
+                                        TaskStatusChoices.STATUS_PAUSE)
+                except Exception as e:
+                    print(e)
+
+
         else:
             print(f'49. No item left to process')
-            if not father_task.done and father_task.parent_id is not None:
-                father_task.done = True
-                father_task.status = TaskStatusChoices.STATUS_SUCCEEDED
-                if father_task.finish_remove_unused == RemoveStatusChoices.REMOVING:
-                    father_task.finish_remove_unused = RemoveStatusChoices.FINISH
-                father_task.save()
+            children_task.done = True
+            children_task.status = TaskStatusChoices.STATUS_SUCCEEDED
+            children_task.save()
 
-            current_queue_args = [
-                father_task.id
-            ]
-            queue_next_sync(children_task, clean_left, current_queue_args, 'clean_left',
-                            TaskStatusChoices.STATUS_SUCCEEDED)
+            clear_children(children_task)
+            return
+
     except Exception as e:
         print("Error: clean_left-1 - {}".format(e))
         print(e)
@@ -601,7 +629,9 @@ def finish_vm_process(vm_info_task_id):
     current_queue_args = [
         vm_info_task.id
     ]
-    queue_next_sync(vm_info_task, clean_left, current_queue_args, 'clean_left', TaskStatusChoices.STATUS_SUCCEEDED)
+    queue_next_sync(vm_info_task, clean_left, current_queue_args, 'clean_left',
+                    TaskStatusChoices.STATUS_SUCCEEDED)
+    # queue_next_sync(vm_info_task, clean_left, current_queue_args, 'clean_left', TaskStatusChoices.STATUS_SUCCEEDED)
     print("FINISH finish_vm_process")
     # cluster_data = delay_sync(vm_info_task, clean_vms, current_queue_args, 1)
 
@@ -793,6 +823,7 @@ def process_vm_info(vm_task_id, proxmox_json, cluster=None, task_id=None):
     vm_info_task.status = TaskStatusChoices.STATUS_RUNNING
     vm_info_task.data_instance = proxmox_json
     vm_info_task.cluster_id = vm_task.cluster_id
+    vm_info_task.job_id = vm_task.job_id
     vm_info_task.save()
     if cluster is None:
         cluster = get_cluster_from_domain(domain)
@@ -845,6 +876,7 @@ def get_vms_for_the_node(node_task_id, task_id, iteration=0):
     vm_task.domain = domain
     vm_task.status = TaskStatusChoices.STATUS_RUNNING
     vm_task.cluster_id = node_task.cluster_id
+    vm_task.job_id = node_task.job_id
     vm_task.save()
 
     try:
@@ -944,6 +976,7 @@ def get_nodes_for_the_cluster(cluster_data_id, task_id, iteration=0):
     cluster_nodes.domain = domain
     cluster_nodes.status = TaskStatusChoices.STATUS_RUNNING
     cluster_nodes.cluster_id = cluster_data.cluster_id
+    cluster_nodes.job_id = cluster_data.job_id
     cluster_nodes.save()
 
     cluster_all = cluster_data.data_instance
@@ -1046,6 +1079,7 @@ def get_cluster_data(cluster_task_id, domain, task_id, iteration=0):
         cluster_data.name = 'Start cluster data'
         cluster_data.domain = domain
         cluster_data.status = TaskStatusChoices.STATUS_RUNNING
+        cluster_data.job_id = cluster_sync.job_id
         cluster_data.save()
         print('25. Getting proxmox session')
         proxmox_session = get_session(domain)
@@ -1125,6 +1159,7 @@ def start_cluster_sync(sync_job_id, task_id, iteration=0):
         cluster_sync.parent = sync_job
         cluster_sync.parent_id = sync_job.id
         cluster_sync.name = 'Start cluster sync'
+        cluster_sync.job_id = sync_job.job_id
         cluster_sync.save()
 
         should_delay = should_delay_job_run(cluster_sync, TaskTypeChoices.START_CLUSTER_SYNC, None)
@@ -1170,6 +1205,9 @@ def job_start_sync(task_id, user, remove_unused):
     print('\n\n***>Executing job_start_sync<***')
     print('1. Start job_start_sync function')
     sync_task = get_or_create_sync_job(task_id, user, remove_unused)
+    if sync_task.job_id is None:
+        sync_task.job_id = uuid.uuid4()
+        sync_task.save()
     if task_id is None or task_id == '':
         task_id = sync_task.task_id
     should_delay = should_delay_job_run(sync_task, TaskTypeChoices.START_SYNC, None)
