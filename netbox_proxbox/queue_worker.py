@@ -567,6 +567,7 @@ def clean_left(id):
         if children_task.done:
             clear_children(children_task)
             return
+        # TODO: There is and error getting the vm's for the cluster
         # if children_task.task_type == TaskTypeChoices.GET_CLUSTER_DATA:
         #     if children_task.remove_unused:
         #         if children_task.finish_remove_unused == RemoveStatusChoices.NOT_STARTED:
