@@ -562,7 +562,6 @@ def remove_unused_step1(id):
 def clean_left(id):
     print("\n\n***>Processing clean_left<***")
     children_task = SyncTask.objects.get(id=id)
-
     try:
         if children_task.done:
             clear_children(children_task)
