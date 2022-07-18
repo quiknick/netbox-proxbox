@@ -468,7 +468,8 @@ def remove_unused_step2(id, nb_vm_each):
                         #
                         # DELETE THE VM/CT
                         #
-                        delete_vm = netbox_obj.delete()
+                        # delete_vm = netbox_obj.delete()
+                        print("Delete vm not implemented")
 
                     else:
                         log_message = "[ERROR] VM will not be removed because the 'Proxbox' tag was not found. -> {}".format(
