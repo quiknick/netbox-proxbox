@@ -1,6 +1,7 @@
 import pytz
 import os
 import time
+import calendar;
 
 from .proxbox_api.remove import is_vm_on_proxmox
 from .proxbox_api.update import nodes, vm_full_update
@@ -399,13 +400,11 @@ def clear_cluster_vms(children_task):
 
 
 def clear_children(children_task):
-    current_queue_args = [
-        children_task.parent_id
-    ]
-    queue_next_sync(children_task, clean_left, current_queue_args, 'clean_left',
-                    TaskStatusChoices.STATUS_SUCCEEDED)
+    parent_id = children_task.parent_id
+    if children_task.parent_id is None:
+        parent_id = children_task.id
 
-    all_finish = SyncTask.objects.filter(parent_id=children_task.parent_id, done=True)
+    all_finish = SyncTask.objects.filter(parent_id=parent_id, done=True)
 
     for el in all_finish:
         try:
@@ -413,11 +412,20 @@ def clear_children(children_task):
         except Exception as e:
             print("Error: clean_left-2 - {}".format(e))
 
+    if children_task.parent_id:
+        current_queue_args = [
+            parent_id
+        ]
+        queue_next_sync(children_task, clean_left, current_queue_args, 'clean_left',
+                        TaskStatusChoices.STATUS_SUCCEEDED)
+
 
 def finish_sync(children_task):
     children_task.done = True
     children_task.status = TaskStatusChoices.STATUS_SUCCEEDED
+    children_task.end_time = (datetime.now()).replace(microsecond=0, tzinfo=pytz.utc)
     children_task.save()
+
     sync_task = get_or_create_sync_job(None, children_task.user, children_task.remove_unused)
     if sync_task.job_id is None:
         sync_task.job_id = uuid.uuid4()
@@ -559,9 +567,13 @@ def remove_unused_step1(id):
 
 
 @job(QUEUE_NAME)
-def clean_left(id):
+def clean_left(item_id):
     print("\n\n***>Processing clean_left<***")
-    children_task = SyncTask.objects.get(id=id)
+    try:
+        children_task = SyncTask.objects.get(id=item_id)
+    except Exception as e:
+        print("***>Error Searching for the task it may not being found<***")
+        print(e)
     try:
         if children_task.done:
             clear_children(children_task)
@@ -573,23 +585,19 @@ def clean_left(id):
         #             clear_cluster_vms(children_task)
         #             return
 
-        if children_task.parent_id is None:
-            if not children_task.done:
-                finish_sync(children_task)
-            return
         all_children = SyncTask.objects.filter(parent_id=children_task.id, done=False)
         if len(all_children) > 0:
             print(f'48. All clusters have not being finish')
 
             current_queue_args = [
-                id
+                item_id
             ]
             delay_sync(children_task, clean_left, current_queue_args, 1)
 
             for elem in all_children:
                 try:
                     if not elem.done and (not elem.task_type == TaskTypeChoices.REMOVE_UNUSED) and (
-                            not elem.task_type == TaskTypeChoices.REMOVE_UNUSED):
+                            not elem.task_type == TaskTypeChoices.REMOVE_UNUSED_STEP2):
                         current_queue_args = [
                             elem.id
                         ]
@@ -597,9 +605,16 @@ def clean_left(id):
                                         TaskStatusChoices.STATUS_PAUSE)
                 except Exception as e:
                     print(e)
-
-
+            return
         else:
+
+            if children_task.parent_id is None:
+                if not children_task.done:
+                    print(f'FINISHING SYNC')
+                    finish_sync(children_task)
+                    clear_children(children_task)
+                return
+
             print(f'49. No item left to process')
             children_task.done = True
             children_task.status = TaskStatusChoices.STATUS_SUCCEEDED
@@ -1210,9 +1225,50 @@ def job_start_sync(task_id, user, remove_unused):
         sync_task.save()
     if task_id is None or task_id == '':
         task_id = sync_task.task_id
+
     should_delay = should_delay_job_run(sync_task, TaskTypeChoices.START_SYNC, None)
     print(f'8. Should delay the job {should_delay}')
     if should_delay:
+        current_running = SyncTask.objects.filter(
+            task_type=TaskTypeChoices.START_SYNC,
+            done=False,
+            status=TaskStatusChoices.STATUS_RUNNING
+        ).first()
+
+        all_children_list = SyncTask.objects.filter(parent_id=current_running.id, done=False)
+        all_children = len(all_children_list)
+
+        if all_children < 1:
+            current_running.done = True
+            current_running.status = TaskStatusChoices.STATUS_FAILED
+            current_running.save()
+            current_running = None
+
+        try:
+            if current_running is not None and not (current_running.id == sync_task.id):
+                ctm = datetime.now().replace(microsecond=0, tzinfo=pytz.utc)
+                ct = ctm.timestamp()
+                st = current_running.start_time if current_running.start_time is not None else current_running.timestamp
+                t = st.replace(microsecond=0, tzinfo=pytz.utc).timestamp()
+                r = (t - ct)
+                r = abs(r)
+
+                if r > 21600:
+                    current_running.done = True
+                    current_running.status = TaskStatusChoices.STATUS_FAILED
+                    current_running.save()
+
+                    if all_children > 0:
+                        current_queue_args = [
+                            current_running.id
+                        ]
+                        queue_next_sync(current_running, clean_left, current_queue_args, 'clean_left',
+                                        TaskStatusChoices.STATUS_SUCCEEDED)
+
+
+        except Exception as e:
+            print(e)
+
         current_queue_args = [
             task_id,
             user,
@@ -1229,6 +1285,8 @@ def job_start_sync(task_id, user, remove_unused):
         ]
         # Run the next function (start_cluster_sync)
         print('14. Run the next function (start_cluster_sync) ')
+        sync_task.start_time = (datetime.now()).replace(microsecond=0, tzinfo=pytz.utc)
+        sync_task.save()
         sync_task = queue_next_sync(sync_task, start_cluster_sync, next_queue_args, 'start_cluster_sync')
     return sync_task
 
