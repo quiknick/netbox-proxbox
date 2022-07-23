@@ -30,6 +30,31 @@ TIME_ZONE = os.environ.get("TIME_ZONE", "UTC")
 
 # model class that subclasses 'ChangeLoggedModel'
 class ProxmoxVM(ChangeLoggedModel):
+    domain = models.CharField(
+        max_length=512,
+        blank=True,
+        null=True,
+        verbose_name="Domain"
+    )
+
+    url = models.CharField(
+        max_length=512,
+        blank=True,
+        null=True,
+        verbose_name="Url"
+    )
+
+    latest_job = models.CharField(
+        max_length=255,
+        blank=True,
+        null=True
+    )
+
+    latest_update = models.DateTimeField(
+        null=True,
+        blank=True
+    )
+
     cluster = models.ForeignKey(  # Field 'cluster' links to Netbox's 'virtualization.Cluster' model
         to="virtualization.Cluster",  # and is set to 'ForeignKey' because of it.
         on_delete=models.SET_NULL,  # If Netbox linked object is deleted, set the field to NULL
@@ -37,33 +62,40 @@ class ProxmoxVM(ChangeLoggedModel):
         null=True,  # Allows corresponding database column to be NULL (contain no value)
         verbose_name="Cluster"
     )
+
     node = models.CharField(
         max_length=64,
         blank=True,
         verbose_name="Node (Server)"
     )
+
     virtual_machine = models.ForeignKey(
         to="virtualization.VirtualMachine",
         on_delete=models.PROTECT,  # linked virtual_machine cannot be deleted as long as this object exists
         verbose_name="Proxmox VM/CT"
     )
+
     status = models.CharField(
         max_length=50,
         choices=VirtualMachineStatusChoices,
         default=VirtualMachineStatusChoices.STATUS_ACTIVE,
         verbose_name='Status'
     )
+
     proxmox_vm_id = models.PositiveIntegerField(verbose_name="Proxmox VM ID")
 
     vcpus = models.PositiveIntegerField(verbose_name="VCPUs")
 
     memory = models.PositiveIntegerField(verbose_name="Memory (MB)")
+
     disk = models.PositiveIntegerField(verbose_name="Disk (GB)")
+
     type = models.CharField(
         max_length=64,
         blank=True,
         verbose_name="Type (qemu or lxc)"
     )
+
     description = models.CharField(
         max_length=200,
         blank=True,
@@ -101,34 +133,53 @@ class ProxmoxVM(ChangeLoggedModel):
 
 class SyncTask(ModelDiffMixin, ChangeLoggedModel):
     task_id = models.UUIDField(default=uuid.uuid4, editable=False, unique=True)
+
     name = models.CharField(max_length=255, blank=True, null=True)
+
     job_id = models.CharField(max_length=255, blank=True, null=True)
+
     timestamp = models.DateTimeField(auto_now_add=True)
+
     task_type = models.CharField(max_length=255, choices=TaskTypeChoices, default=TaskTypeChoices.UNDEFINED)
+
     status = models.CharField(max_length=255, choices=TaskStatusChoices, default=TaskStatusChoices.STATUS_UNKNOWN)
+
     message = models.CharField(max_length=512, blank=True, null=True)
+
     fail_reason = models.CharField(max_length=512, blank=True, null=True)
+
     done = models.BooleanField(default=False)
+
     remove_unused = models.BooleanField(default=True)
+
     scheduled_time = models.DateTimeField(blank=True)
+
     start_time = models.DateTimeField(null=True)
+
     end_time = models.DateTimeField(null=True)
+
     duration = models.PositiveIntegerField(blank=True, null=True)
+
     log = models.TextField(blank=True)
+
     user = models.CharField(max_length=255, blank=True)
+
     domain = models.CharField(max_length=255, blank=True, null=True)
+
     parent = models.ForeignKey(
         to='self',
         on_delete=models.CASCADE,
         blank=True,
         null=True,
     )
+
     device = models.ForeignKey(
         to="dcim.Device",
         on_delete=models.SET_NULL,
         blank=True,
         null=True,
         verbose_name="Node")
+
     cluster = models.ForeignKey(  # Field 'cluster' links to Netbox's 'virtualization.Cluster' model
         to="virtualization.Cluster",  # and is set to 'ForeignKey' because of it.
         on_delete=models.SET_NULL,  # If Netbox linked object is deleted, set the field to NULL
@@ -136,6 +187,7 @@ class SyncTask(ModelDiffMixin, ChangeLoggedModel):
         null=True,  # Allows corresponding database column to be NULL (contain no value)
         verbose_name="Cluster"
     )
+
     virtual_machine = models.ForeignKey(
         to="virtualization.VirtualMachine",
         on_delete=models.SET_NULL,  # linked virtual_machine cannot be deleted as long as this object exists
@@ -143,14 +195,29 @@ class SyncTask(ModelDiffMixin, ChangeLoggedModel):
         null=True,
         verbose_name="Proxmox VM/CT"
     )
+
     data_instance = models.JSONField(
         blank=True,
         null=True
     )
-    progress = models.PositiveIntegerField(blank=True, null=True)
-    progress_status = models.CharField(max_length=255, blank=True, null=True)
-    finish_remove_unused = models.CharField(max_length=255, choices=RemoveStatusChoices,
-                                            default=RemoveStatusChoices.NOT_STARTED)
+
+    progress = models.PositiveIntegerField(
+        blank=True,
+        null=True
+    )
+
+    progress_status = models.CharField(
+        max_length=255,
+        blank=True,
+        null=True
+    )
+
+    finish_remove_unused = models.CharField(
+        max_length=255,
+        choices=RemoveStatusChoices,
+        default=RemoveStatusChoices.NOT_STARTED
+    )
+
     # Retrieve and filter 'ProxmoxVM' records
     objects = RestrictedQuerySet.as_manager()
 
