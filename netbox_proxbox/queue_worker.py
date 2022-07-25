@@ -3,6 +3,7 @@ import os
 
 try:
     from django_rq import job
+    from django.db import connection
 
     from .proxbox_api.remove import is_vm_on_proxmox
     from .proxbox_api.update import nodes, vm_full_update
@@ -62,33 +63,58 @@ TIME_ZONE = os.environ.get("TIME_ZONE", "UTC")
 #     ]
 #     delay_sync(children_task, clean_left, current_queue_args, 1)
 
+def update_children_sql(parent_id):
+    try:
+        with connection.cursor() as cursor:
+            cursor.execute("UPDATE netbox_proxbox_synctask SET done = true WHERE parent_id = %s", [parent_id])
+        return True
+    except Exception as e:
+        print(e)
+        print("Error: update_children_sql - {}".format(e))
+        return False
+
+
+def update_finish_sql(job_id, task_type):
+    try:
+        with connection.cursor() as cursor:
+            cursor.execute("UPDATE netbox_proxbox_synctask SET done = true WHERE job_id = %s", [job_id])
+            cursor.execute("DELETE from netbox_proxbox_synctask where job_id = %s and task_type != %s",
+                           [job_id, task_type])
+        return True
+    except Exception as e:
+        print(e)
+        print("Error: update_children_sql - {}".format(e))
+        return False
+
 
 def clear_children(children_task):
     parent_id = children_task.parent_id
     if children_task.parent_id is None:
         parent_id = children_task.id
 
-    all_finish = SyncTask.objects.filter(parent_id=parent_id, done=True)
+    update_children_sql(parent_id)
+    return
+    # all_finish = SyncTask.objects.filter(parent_id=parent_id, done=True)
+    #
+    # for el in all_finish:
+    #     try:
+    #         el.delete()
+    #     except Exception as e:
+    #         print(e)
+    #         print("Error: clean_left-2 - {}".format(e))
 
-    for el in all_finish:
-        try:
-            el.delete()
-        except Exception as e:
-            print(e)
-            print("Error: clean_left-2 - {}".format(e))
-
-    if children_task.parent_id:
-        try:
-            children_task.status = TaskStatusChoices.STATUS_SUCCEEDED
-            children_task.done = True
-            children_task.save()
-        except Exception as e:
-            print(e)
-        current_queue_args = [
-            parent_id
-        ]
-        queue_next_sync(None, clean_left, current_queue_args, 'clean_left',
-                        TaskStatusChoices.STATUS_SUCCEEDED)
+    # if children_task.parent_id:
+    #     try:
+    #         children_task.status = TaskStatusChoices.STATUS_SUCCEEDED
+    #         children_task.done = True
+    #         children_task.save()
+    #     except Exception as e:
+    #         print(e)
+    #     current_queue_args = [
+    #         parent_id
+    #     ]
+    #     queue_next_sync(None, clean_left, current_queue_args, 'clean_left',
+    #                     TaskStatusChoices.STATUS_SUCCEEDED)
 
 
 def finish_sync(children_task):
@@ -98,6 +124,7 @@ def finish_sync(children_task):
     children_task.save()
 
     sync_task = get_or_create_sync_job(None, children_task.user, children_task.remove_unused)
+
     if sync_task.job_id is None:
         sync_task.job_id = uuid.uuid4()
         sync_task.save()
@@ -105,6 +132,13 @@ def finish_sync(children_task):
         sync_task.task_id, children_task.user, children_task.remove_unused
     ]
     delay_sync(sync_task, start_sync, current_queue_args, 480)
+
+    try:
+        update_finish_sql(children_task.job_id, TaskTypeChoices.START_SYNC)
+    except Exception as e:
+        print(e)
+        print("Error: finish_sync-1 - {}".format(e))
+    return
 
 
 # @job(QUEUE_NAME)
@@ -251,6 +285,11 @@ def clean_left(item_id):
             return
         if children_task.done:
             clear_children(children_task)
+            current_queue_args = [
+                children_task.parent_id
+            ]
+            queue_next_sync(None, clean_left, current_queue_args, 'clean_left',
+                            TaskStatusChoices.STATUS_SUCCEEDED)
             return
         # TODO: There is and error getting the vm's for the cluster
         # if children_task.task_type == TaskTypeChoices.GET_CLUSTER_DATA:
@@ -290,11 +329,11 @@ def clean_left(item_id):
                     except Exception as e:
                         print(f'Error finishing the sync')
                         print(e)
-                    try:
-                        clear_children(children_task)
-                    except Exception as e:
-                        print(f'Error cleaning children')
-                        print(e)
+                    # try:
+                    #     clear_children(children_task)
+                    # except Exception as e:
+                    #     print(f'Error cleaning children')
+                    #     print(e)
                 return
 
             print(f'49. No item left to process')
@@ -303,6 +342,11 @@ def clean_left(item_id):
             children_task.save()
 
             clear_children(children_task)
+            current_queue_args = [
+                children_task.parent_id
+            ]
+            queue_next_sync(None, clean_left, current_queue_args, 'clean_left',
+                            TaskStatusChoices.STATUS_SUCCEEDED)
             return
 
     except Exception as e:
@@ -313,6 +357,7 @@ def clean_left(item_id):
         children_task.message = e
         children_task.fail_reason = e
         children_task.save()
+        return
 
 
 @job(QUEUE_NAME)
