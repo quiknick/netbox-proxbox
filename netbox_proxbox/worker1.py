@@ -37,7 +37,7 @@ TIME_ZONE = os.environ.get("TIME_ZONE", "UTC")
 #         if task_id is None or task_id == '':
 #             sync_job = None
 #         else:
-#             sync_job = SyncTask.objects.get(task_id=task_id)
+#             sync_job = SyncTask.objects.get(id=task_id)
 #     except Exception as e:
 #         print(e)
 #         sync_job = None
@@ -166,7 +166,7 @@ TIME_ZONE = os.environ.get("TIME_ZONE", "UTC")
 #     print('Get the task by its task_id if no task_id is set then it will be created later')
 #     for job in running_job:
 #         if sync_task is not None:
-#             if sync_task.task_id == job.task_id:
+#             if sync_task.id == job.id:
 #                 total_running_jobs = 0
 #                 break
 #     # if another sync process is running delay the current execution
@@ -192,7 +192,7 @@ TIME_ZONE = os.environ.get("TIME_ZONE", "UTC")
 #     # sync_task = get_or_create_sync_job(task_id, user, remove_unused)
 #     #
 #     # if task_id is None or task_id == '':
-#     #     task_id = sync_task.task_id
+#     #     task_id = sync_task.id
 #     # # Check if the process should be delay or not
 #     # print('Check if the process should be delay or not')
 #     # should_delay = should_delay_job_run_1(sync_task, TaskTypeChoices.START_SYNC, None)
@@ -274,7 +274,7 @@ def start_sync(task_id, user, remove_unused=True):
     #     if sync_task is None:
     #         return f'No sync task created'
     #     else:
-    #         return f'Finish:{sync_task.name}:{sync_task.task_id}'
+    #         return f'Finish:{sync_task.name}:{sync_task.id}'
     # except Exception as e:
     #     print(e)
 #
@@ -290,12 +290,12 @@ def start_sync(task_id, user, remove_unused=True):
 #     #     message = f'-> {datetime.now(pytz.timezone(TIME_ZONE)).strftime("%Y-%m-%d %H:%M:%S")} - {msg}'
 #     #     log.info(message)
 #     #     print(message)
-#     #     sync_job = SyncTask.objects.get(task_id=sync_job_id)
+#     #     sync_job = SyncTask.objects.get(id=sync_job_id)
 #     #     user = sync_job.user
 #     #     remove_unused = sync_job.remove_unused
 #     #     cluster_sync = get_or_create_sync_job(task_id, user, remove_unused, TaskTypeChoices.START_CLUSTER_SYNC)
 #     #     if task_id is None or task_id == '':
-#     #         task_id = cluster_sync.task_id
+#     #         task_id = cluster_sync.id
 #     #     cluster_sync.parent = sync_job
 #     #     cluster_sync.parent_id = sync_job.id
 #     #     cluster_sync.name = 'Start cluster sync'
@@ -309,7 +309,7 @@ def start_sync(task_id, user, remove_unused=True):
 #     #             task_id
 #     #         ]
 #     #         cluster_sync = delay_sync(cluster_sync, start_cluster_sync, schedule_args)
-#     #         return f'Job delay: {cluster_sync.name}:{cluster_sync.task_id}'
+#     #         return f'Job delay: {cluster_sync.name}:{cluster_sync.id}'
 #     #
 #     #     for key in proxmox_sessions:
 #     #         try:
@@ -324,7 +324,7 @@ def start_sync(task_id, user, remove_unused=True):
 #     #             message = "OS error: {0}".format(e)
 #     #             print(message)
 #     #             log.error(e)
-#     #     return f'Finish:{cluster_sync.name}:{cluster_sync.task_id}'
+#     #     return f'Finish:{cluster_sync.name}:{cluster_sync.id}'
 #     # except Exception as e:
 #     #     print(e)
 #     #     return f'Error'
@@ -337,13 +337,13 @@ def start_sync(task_id, user, remove_unused=True):
 #     #     message = f'-> {datetime.now(pytz.timezone(TIME_ZONE)).strftime("%Y-%m-%d %H:%M:%S")} - {msg}'
 #     #     log.info(message)
 #     #     print(message)
-#     #     cluster_sync = SyncTask.objects.get(task_id=cluster_task_id)
+#     #     cluster_sync = SyncTask.objects.get(id=cluster_task_id)
 #     #     user = cluster_sync.user
 #     #     remove_unused = cluster_sync.remove_unused
 #     #
 #     #     cluster_data = get_or_create_sync_job(task_id, user, remove_unused, TaskTypeChoices.START_CLUSTER_SYNC)
 #     #     if task_id is None or task_id == '':
-#     #         task_id = cluster_data.task_id
+#     #         task_id = cluster_data.id
 #     #     cluster_data.parent = cluster_sync
 #     #     cluster_data.parent_id = cluster_sync.id
 #     #     cluster_data.name = 'Start cluster data'
