@@ -161,7 +161,7 @@ def get_or_create_sync_job(
             sync_job = None
         else:
             print(f'24. Trying to the get the sync job with id: {task_id}')
-            sync_job = SyncTask.objects.get(task_id=task_id)
+            sync_job = SyncTask.objects.get(id=task_id)
     except Exception as e:
         print("Error: get_or_create_sync_job-1 - {}".format(e))
         print(e)
@@ -219,7 +219,7 @@ def should_delay_job_run(
     print('7. Get the task by its task_id if no task_id is set then it will be created later')
     for job in running_job:
         if sync_task is not None:
-            if sync_task.task_id == job.task_id:
+            if sync_task.id == job.id:
                 total_running_jobs = 0
                 break
     try:
@@ -241,7 +241,7 @@ def get_process_vm(vm_info_task_id):
     print(message)
 
     try:
-        vm_info_task = SyncTask.objects.get(task_id=vm_info_task_id)
+        vm_info_task = SyncTask.objects.get(id=vm_info_task_id)
         return vm_info_task
     except Exception as e:
         print("Error: get_process_vm-1 - {}".format(e))
@@ -283,45 +283,6 @@ def nb_search_data_(proxmox_json, domain, cluster=None):
 def set_vm(vm_info_task, cluster=None):
     print('[OK] STARTING PROCESS FOR VIRTUAL MACHINE')
     proxmox_json = vm_info_task.data_instance
-    # try:
-    #     proxmox_session = get_session(vm_info_task.domain)
-    #     proxmox = proxmox_session.get('PROXMOX_SESSION')
-    # except Exception as e:
-    #     print(e)
-    #
-    # proxmox_vm_name = None
-    #
-    # # Decide whether 'proxmox_json' or other args (id, proxmox_id and proxmox_name) will be used
-    # if proxmox_json != None:
-    #     proxmox_vm_name = proxmox_json['name']
-    #
-    # if proxmox_vm_name == None:
-    #     return False
-    #
-    # # Search Netbox object by name gotten from Proxmox
-    # print('[OK] Getting node')
-    # node = proxmox_json['node']
-    # print('[OK] Getting cluster')
-    # cluster = create.virtualization.cluster(proxmox)
-    #
-    # print('[OK] Getting vmid')
-    # vmid = proxmox_json['vmid']
-    # # print('[OK] Getting getting vm from netbox for {} , {}, {}'.format(cluster.name, vmid, node))
-    # # netbox_vm_all = nb.virtualization.virtual_machines.filter(cluster=cluster.name, cf_proxmox_id=vmid,
-    # #                                                           cf_proxmox_node=node)
-    # # netbox_vm = None
-    # # for vm in netbox_vm_all:
-    # #     netbox_vm = vm
-    # #     break
-    # # netbox_vm = get_nb_vm_by_data(cluster.name, vmid, node)
-    # # if netbox_vm == None:
-    # #     netbox_vm = get_nb_vm_by_name(cluster.name, proxmox_vm_name)
-    # # netbox_vm_all = nb.virtualization.virtual_machines.filter(cluster=cluster.name, name=proxmox_vm_name)
-    # # for vm in netbox_vm_all:
-    # #     netbox_vm = vm
-    # #     break
-    # # Analyze if VM exist on Netbox
-    # # If VM/CT already exist on Proxmox, check VM and update it, if necessary.
 
     cluster, vmid, node, proxmox_vm_name, proxmox_session, proxmox = nb_search_data_(proxmox_json, vm_info_task.domain,
                                                                                      cluster)

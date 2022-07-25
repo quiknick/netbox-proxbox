@@ -127,9 +127,10 @@ def finish_sync(children_task):
 
     if sync_task.job_id is None:
         sync_task.job_id = uuid.uuid4()
+        sync_task.status = TaskStatusChoices.STATUS_SCHEDULED
         sync_task.save()
     current_queue_args = [
-        sync_task.task_id, children_task.user, children_task.remove_unused
+        sync_task.id, children_task.user, children_task.remove_unused
     ]
     delay_sync(sync_task, start_sync, current_queue_args, 480)
 
@@ -494,11 +495,11 @@ def update_vm_process(vm_info_task_id, cluster=None, netbox_vm=None, step='finis
 
         if step == 'finish':
             print('FINISH ALL PROCESS')
-            process_vm_info_args = [vm_info_task.task_id]
+            process_vm_info_args = [vm_info_task.id]
             print(f'42. Run the next function (update_vm_status_queue for {vm_info_task_id}) ')
             queue_next_sync(vm_info_task, finish_vm_process, process_vm_info_args, 'finish_vm_process')
         else:
-            process_vm_info_args = [vm_info_task.task_id, cluster, netbox_vm, next_step]
+            process_vm_info_args = [vm_info_task.id, cluster, netbox_vm, next_step]
             print(f'42. Run the next function (update_vm_status_queue for {vm_info_task_id}) ')
             m = 'update_vm_process_' + next_step
             queue_next_sync(vm_info_task, update_vm_process, process_vm_info_args, m)
@@ -525,7 +526,7 @@ def process_vm_info2(vm_info_task_id, cluster=None):
         # vm_full_update(proxmox_session, netbox_vm, proxmox_json)
         # print("FINISH process_vm_info2")
 
-        process_vm_info_args = [vm_info_task.task_id, cluster, netbox_vm, 'status']
+        process_vm_info_args = [vm_info_task.id, cluster, netbox_vm, 'status']
         print(f'42. Run the next function (update_vm_process for {vm_info_task_id}) ')
         queue_next_sync(vm_info_task, update_vm_process, process_vm_info_args, 'update_vm_process')
 
@@ -538,13 +539,13 @@ def process_vm_info2(vm_info_task_id, cluster=None):
 @job(QUEUE_NAME)
 def process_vm_info(vm_task_id, proxmox_json, cluster=None, task_id=None):
     print('\n\n***>Executing process_vm_info<***')
-    msg = f'[Start VMs data:{vm_task_id}:{task_id}]'
+    msg = f'[Start VMs data:{vm_task_id}:{"None" if task_id is None else task_id}]'
     message = f'-> {datetime.now(pytz.timezone(TIME_ZONE)).strftime("%Y-%m-%d %H:%M:%S")} - {msg}'
     log.info(message)
     print(message)
 
     try:
-        vm_task = SyncTask.objects.get(task_id=vm_task_id)
+        vm_task = SyncTask.objects.get(id=vm_task_id)
     except Exception as e:
         print("Error: update_vm_process-process_vm_info-vm_task - {}".format(e))
         return 'Error'
@@ -554,7 +555,7 @@ def process_vm_info(vm_task_id, proxmox_json, cluster=None, task_id=None):
     print('40. Getting or creating the node data sync job')
     vm_info_task = get_or_create_sync_job(task_id, user, remove_unused, TaskTypeChoices.START_VM_SYNC)
     if task_id is None or task_id == '':
-        task_id = vm_task.task_id
+        task_id = vm_task.id
 
     print('41. Updating info for the cluster data')
     vm_info_task.parent = vm_task
@@ -569,9 +570,9 @@ def process_vm_info(vm_task_id, proxmox_json, cluster=None, task_id=None):
     if cluster is None:
         cluster = get_cluster_from_domain(domain)
 
-    process_vm_info_args = [vm_info_task.task_id, cluster]
+    process_vm_info_args = [vm_info_task.id, cluster]
 
-    print(f'42. Run the next function (process_vm_info2 for {vm_info_task.task_id}) ')
+    print(f'42. Run the next function (process_vm_info2 for {vm_info_task.id}) ')
     print(process_vm_info_args)
     queue_next_sync(vm_info_task, process_vm_info2, process_vm_info_args, 'process_vm_info2')
 
@@ -581,7 +582,7 @@ def process_vm_info(vm_task_id, proxmox_json, cluster=None, task_id=None):
 @job(QUEUE_NAME)
 def get_vms_for_the_node(node_task_id, task_id, iteration=0):
     print('\n\n***>Executing get_vms_for_the_node<***')
-    msg = f'[Start VMs data:{node_task_id}:{task_id}] iteration: {iteration}'
+    msg = f'[Start VMs data:{node_task_id}:{"None" if task_id is None else task_id}] iteration: {iteration}'
     message = f'-> {datetime.now(pytz.timezone(TIME_ZONE)).strftime("%Y-%m-%d %H:%M:%S")} - {msg}'
     log.info(message)
     print(message)
@@ -589,7 +590,7 @@ def get_vms_for_the_node(node_task_id, task_id, iteration=0):
         return f'Canceling the job'
 
     try:
-        node_task = SyncTask.objects.get(task_id=node_task_id)
+        node_task = SyncTask.objects.get(id=node_task_id)
     except Exception as e:
         print("Error: update_vm_process-get_vms_for_the_node - {}".format(e))
         print(e)
@@ -609,7 +610,7 @@ def get_vms_for_the_node(node_task_id, task_id, iteration=0):
     vm_task = get_or_create_sync_job(task_id, user, remove_unused, TaskTypeChoices.GET_VMS_FROM_NODES)
 
     if task_id is None or task_id == '':
-        task_id = vm_task.task_id
+        task_id = vm_task.id
     print('36. Updating info for the cluster data')
     vm_task.parent = node_task
     vm_task.parent_id = node_task.id
@@ -641,7 +642,7 @@ def get_vms_for_the_node(node_task_id, task_id, iteration=0):
         # Run the delay process if there is already other process with the same characterics is running
         print('38. Run the delay process if there is already other process with the same characterics is running')
         cluster_nodes = delay_sync(vm_task, start_cluster_sync, current_queue_args, 1)
-        return f'Delaying :{cluster_nodes.name}:{cluster_nodes.task_id}'
+        return f'Delaying :{cluster_nodes.name}:{cluster_nodes.id}'
     else:
         print('\nUPDATE ALL...')
         # Get all VM/CTs from Proxmox
@@ -664,7 +665,7 @@ def get_vms_for_the_node(node_task_id, task_id, iteration=0):
                 if is_template == 1:
                     continue
                 process_vm_info_args = [
-                    vm_task.task_id, px_vm_each, cluster, None
+                    vm_task.id, px_vm_each, cluster, None
                 ]
 
                 print(f'34. Run the next function (process_vm_info for {domain}) ')
@@ -682,14 +683,14 @@ def get_vms_for_the_node(node_task_id, task_id, iteration=0):
 @job(QUEUE_NAME)
 def get_nodes_for_the_cluster(cluster_data_id, task_id, iteration=0):
     print('\n\n***>Executing get_nodes_for_the_cluster<***')
-    msg = f'[Start nodes data:{cluster_data_id}:{task_id}] iteration: {iteration}'
+    msg = f'[Start nodes data:{cluster_data_id}:{"None" if task_id is None else task_id}] iteration: {iteration}'
     message = f'-> {datetime.now(pytz.timezone(TIME_ZONE)).strftime("%Y-%m-%d %H:%M:%S")} - {msg}'
     log.info(message)
     print(message)
     if iteration > 3:
         return f'Canceling the job'
     try:
-        cluster_data = SyncTask.objects.get(task_id=cluster_data_id)
+        cluster_data = SyncTask.objects.get(id=cluster_data_id)
     except Exception as e:
         print("Error: update_vm_process-get_nodes_for_the_cluster - {}".format(e))
         print(e)
@@ -709,7 +710,7 @@ def get_nodes_for_the_cluster(cluster_data_id, task_id, iteration=0):
     cluster_nodes = get_or_create_sync_job(task_id, user, remove_unused, TaskTypeChoices.START_NODE_SYNC)
 
     if task_id is None or task_id == '':
-        task_id = cluster_data.task_id
+        task_id = cluster_data.id
     print('30. Updating info for the cluster data')
     cluster_nodes.parent = cluster_data
     cluster_nodes.parent_id = cluster_data.id
@@ -740,10 +741,10 @@ def get_nodes_for_the_cluster(cluster_data_id, task_id, iteration=0):
         # Run the delay process if there is already other process with the same characterics is running
         print('32. Run the delay process if there is already other process with the same characterics is running')
         cluster_nodes = delay_sync(cluster_nodes, start_cluster_sync, current_queue_args, 1)
-        return f'Delaying :{cluster_nodes.name}:{cluster_nodes.task_id}'
+        return f'Delaying :{cluster_nodes.name}:{cluster_nodes.id}'
     else:
         # Run the next function (start_cluster_sync)
-        cluster_nodes_id = cluster_nodes.task_id
+        cluster_nodes_id = cluster_nodes.id
         # Get all NODES from Proxmox
         try:
             proxmox_session = get_session(domain)
@@ -786,7 +787,7 @@ def get_nodes_for_the_cluster(cluster_data_id, task_id, iteration=0):
 def get_cluster_data(cluster_task_id, domain, task_id, iteration=0):
     print('\n\n***>Executing get_cluster_data<***')
     try:
-        msg = f'[Start getting cluster data:{cluster_task_id}:{domain}:{task_id}] iteration: {iteration}'
+        msg = f'[Start getting cluster data:{cluster_task_id}:{domain}:{"none" if task_id is None else task_id}] iteration: {iteration}'
         message = f'-> {datetime.now(pytz.timezone(TIME_ZONE)).strftime("%Y-%m-%d %H:%M:%S")} - {msg}'
         log.info(message)
         print(message)
@@ -794,7 +795,7 @@ def get_cluster_data(cluster_task_id, domain, task_id, iteration=0):
             return f'Canceling the job'
 
         try:
-            cluster_sync = SyncTask.objects.get(task_id=cluster_task_id)
+            cluster_sync = SyncTask.objects.get(id=cluster_task_id)
         except Exception as e:
             print("Error: get_cluster_data-cluster {}".format(e))
             print(e)
@@ -816,7 +817,7 @@ def get_cluster_data(cluster_task_id, domain, task_id, iteration=0):
         cluster_data = get_or_create_sync_job(task_id, user, remove_unused, TaskTypeChoices.GET_CLUSTER_DATA)
 
         if task_id is None or task_id == '':
-            task_id = cluster_data.task_id
+            task_id = cluster_data.id
 
         print('24. Updating info for the cluster data')
         cluster_data.parent = cluster_sync
@@ -841,7 +842,7 @@ def get_cluster_data(cluster_task_id, domain, task_id, iteration=0):
 
         proxmox_cluster = cluster_all[0]
         print(proxmox_cluster)
-        print('Finish get_cluster_data')
+        print('[OK] Finish get_cluster_data')
         should_delay = should_delay_job_run(cluster_data, TaskTypeChoices.GET_CLUSTER_DATA, domain)
         print(f'26. Should delay the job {should_delay}')
         if should_delay:
@@ -851,11 +852,11 @@ def get_cluster_data(cluster_task_id, domain, task_id, iteration=0):
             # Run the delay process if there is already other process with the same characterics is running
             print('27. Run the delay process if there is already other process with the same characterics is running')
             cluster_data = delay_sync(cluster_data, start_cluster_sync, current_queue_args, 1)
-            return f'Delaying :{cluster_data.name}:{cluster_data.task_id}'
+            return f'Delaying :{cluster_data.name}:{cluster_data.id}'
         else:
             # Run the next function (start_cluster_sync)
 
-            cluster_data_id = cluster_data.task_id
+            cluster_data_id = cluster_data.id
             get_nodes_for_the_cluster_args = [
                 cluster_data_id, None, 0
             ]
@@ -882,10 +883,10 @@ def start_cluster_sync(sync_job_id, task_id, iteration=0):
         log.info(message)
         print(message)
         try:
-            sync_job = SyncTask.objects.get(task_id=sync_job_id)
+            sync_job = SyncTask.objects.get(id=sync_job_id)
         except Exception as e:
             print("Error: start_cluster_sync-sync_job {}".format(e))
-            print('SYNC JOB NOT FOUN DELAYING IN ORDER TO WAIT FOR THE DATA BASE COMMIT')
+            print('SYNC JOB NOT FOUND DELAYING IN ORDER TO WAIT FOR THE DATA BASE COMMIT')
             print(e)
             iteration = iteration + 1
             current_queue_args = [
@@ -899,7 +900,7 @@ def start_cluster_sync(sync_job_id, task_id, iteration=0):
         remove_unused = sync_job.remove_unused
         cluster_sync = get_or_create_sync_job(task_id, user, remove_unused, TaskTypeChoices.START_CLUSTER_SYNC)
         if task_id is None or task_id == '':
-            task_id = cluster_sync.task_id
+            task_id = cluster_sync.id
         print('18. Set parent for the cluster job')
         cluster_sync.parent = sync_job
         cluster_sync.parent_id = sync_job.id
@@ -912,20 +913,20 @@ def start_cluster_sync(sync_job_id, task_id, iteration=0):
         if should_delay:
             current_queue_args = [
                 sync_job_id,
-                task_id,
+                cluster_sync.id,
                 0
             ]
             # Run the delay process if there is already other process with the same characterics is running
             print('20. Run the delay process if there is already other process with the same characterics is running')
             cluster_sync = delay_sync(cluster_sync, start_cluster_sync, current_queue_args, 1)
-            return f'Delaying :{cluster_sync.name}:{cluster_sync.task_id}'
+            return f'Delaying :{cluster_sync.name}:{cluster_sync.id}'
         else:
             # Run the next function (start_cluster_sync)
             for key in proxmox_sessions:
                 try:
                     session = proxmox_sessions[key]
                     domain = session['PROXMOX']
-                    cluster_task_id = cluster_sync.task_id
+                    cluster_task_id = cluster_sync.id
                     get_cluster_data_args = [
                         cluster_task_id,
                         domain,
@@ -939,7 +940,7 @@ def start_cluster_sync(sync_job_id, task_id, iteration=0):
                     message = "OS error: {0}".format(e)
                     print(message)
                     log.error(e)
-            return f'Finish:{cluster_sync.name}:{cluster_sync.task_id}'
+            return f'Finish:{cluster_sync.name}:{cluster_sync.id}'
     except Exception as e:
         print("Error: start_cluster_sync-all-1 {}".format(e))
         print(e)
@@ -954,7 +955,7 @@ def job_start_sync(task_id, user, remove_unused):
         sync_task.job_id = uuid.uuid4()
         sync_task.save()
     if task_id is None or task_id == '':
-        task_id = sync_task.task_id
+        task_id = sync_task.id
 
     should_delay = should_delay_job_run(sync_task, TaskTypeChoices.START_SYNC, None)
     print(f'8. Should delay the job {should_delay}')
@@ -1000,7 +1001,7 @@ def job_start_sync(task_id, user, remove_unused):
             print(e)
 
         current_queue_args = [
-            task_id,
+            start_sync.id,
             user,
             remove_unused
         ]
@@ -1022,15 +1023,15 @@ def job_start_sync(task_id, user, remove_unused):
 
 
 @job(QUEUE_NAME)
-def start_sync(task_id, user, remove_unused=True):
+def start_sync(id, user, remove_unused=True):
     print('\n\n***>Executing start_sync<***')
     msg = '[Proxbox - Netbox plugin | Update All | queue]'
     message = f'-> {datetime.now(pytz.timezone(TIME_ZONE)).strftime("%Y-%m-%d %H:%M:%S")} - {msg}'
     log.info(message)
     print(message)
-    sync_task = job_start_sync(task_id, user, True)
+    sync_task = job_start_sync(id, user, True)
     print('Finish start_sync')
     if sync_task is None:
         return f'No sync task created'
     else:
-        return f'Finish:{sync_task.name}:{sync_task.task_id}'
+        return f'Finish:{sync_task.name}:{sync_task.id}'
