@@ -49,21 +49,20 @@ def get_set_cluster(proxmox):
     # Verify if there any cluster created with:
     # Name equal to Proxmox's Cluster name
     # Cluster type equal to 'proxmox'
-    cluster_proxbox = Cluster.objects.filter(name=proxmox_cluster_name, type_id=cluster_type_.id).first()
+    cluster_proxbox = Cluster.objects.filter(name=proxmox_cluster_name).first()
 
     # If no 'cluster' found, create one using the name from Proxmox
-    if cluster_proxbox == None:
-
+    if cluster_proxbox is None:
         try:
             # Create the cluster with only name and cluster_type
-
+            tg = tag()
             cluster = Cluster(
                 name=proxmox_cluster_name,
                 type_id=cluster_type_.id,
                 type=cluster_type_,
-                tags=[tag().id]
             )
             cluster.save()
+            cluster.tags.add(tg)
         except:
             return "Error creating the '{0}' cluster. Possible errors: the name '{0}' is already used.".format(
                 proxmox_cluster_name)

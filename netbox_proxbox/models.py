@@ -30,6 +30,13 @@ TIME_ZONE = os.environ.get("TIME_ZONE", "UTC")
 
 # model class that subclasses 'ChangeLoggedModel'
 class ProxmoxVM(ChangeLoggedModel):
+    name = models.CharField(
+        max_length=255,
+        blank=True,
+        null=True,
+        verbose_name="Name"
+    )
+
     domain = models.CharField(
         max_length=512,
         blank=True,
@@ -47,12 +54,14 @@ class ProxmoxVM(ChangeLoggedModel):
     latest_job = models.CharField(
         max_length=255,
         blank=True,
-        null=True
+        null=True,
+        verbose_name="Last job"
     )
 
     latest_update = models.DateTimeField(
         null=True,
-        blank=True
+        blank=True,
+        verbose_name="Last update at"
     )
 
     cluster = models.ForeignKey(  # Field 'cluster' links to Netbox's 'virtualization.Cluster' model
@@ -64,14 +73,17 @@ class ProxmoxVM(ChangeLoggedModel):
     )
 
     node = models.CharField(
-        max_length=64,
         blank=True,
+        null=True,
+        max_length=64,
         verbose_name="Node (Server)"
     )
 
     virtual_machine = models.ForeignKey(
+        blank=True,
+        null=True,
         to="virtualization.VirtualMachine",
-        on_delete=models.PROTECT,  # linked virtual_machine cannot be deleted as long as this object exists
+        on_delete=models.SET_NULL,  # linked virtual_machine cannot be deleted as long as this object exists
         verbose_name="Proxmox VM/CT"
     )
 
@@ -79,27 +91,67 @@ class ProxmoxVM(ChangeLoggedModel):
         max_length=50,
         choices=VirtualMachineStatusChoices,
         default=VirtualMachineStatusChoices.STATUS_ACTIVE,
-        verbose_name='Status'
+        verbose_name='Status',
+        blank=True,
+        null=True
     )
 
-    proxmox_vm_id = models.PositiveIntegerField(verbose_name="Proxmox VM ID")
+    proxmox_vm_id = models.PositiveIntegerField(
+        blank=True,
+        null=True,
+        verbose_name="Proxmox VM ID"
+    )
 
-    vcpus = models.PositiveIntegerField(verbose_name="VCPUs")
+    vcpus = models.PositiveIntegerField(
+        blank=True,
+        null=True,
+        verbose_name="VCPUs"
+    )
 
-    memory = models.PositiveIntegerField(verbose_name="Memory (MB)")
+    memory = models.PositiveIntegerField(
+        blank=True,
+        null=True,
+        verbose_name="Memory (MB)"
+    )
 
-    disk = models.PositiveIntegerField(verbose_name="Disk (GB)")
+    disk = models.PositiveIntegerField(
+        blank=True,
+        null=True,
+        verbose_name="Disk (GB)"
+    )
+
+    device = models.ForeignKey(
+        to="dcim.Device",
+        on_delete=models.SET_NULL,
+        blank=True,
+        null=True,
+        verbose_name="Node"
+    )
 
     type = models.CharField(
         max_length=64,
         blank=True,
+        null=True,
         verbose_name="Type (qemu or lxc)"
     )
 
     description = models.CharField(
         max_length=200,
         blank=True,
+        null=True,
         verbose_name="Description"
+    )
+
+    instance_data = models.JSONField(
+        blank=True,
+        null=True,
+        verbose_name="Proxmox data"
+    )
+
+    config_data = models.JSONField(
+        blank=True,
+        null=True,
+        verbose_name="Proxmox configuration"
     )
 
     # Retrieve and filter 'ProxmoxVM' records
@@ -107,7 +159,11 @@ class ProxmoxVM(ChangeLoggedModel):
 
     # display name of ProxmoxVM object defined to virtual_machine
     def __str__(self):
-        return f"{self.virtual_machine}"
+        if self.virtual_machine:
+            return f"{self.virtual_machine}"
+        if self.name:
+            return f"{self.name}"
+        return "No name of virtual machine"
 
     def get_absolute_url(self):
         """Provide absolute URL to a ProxmoxVM object."""
@@ -132,57 +188,113 @@ class ProxmoxVM(ChangeLoggedModel):
 
 
 class SyncTask(ModelDiffMixin, ChangeLoggedModel):
-    task_id = models.UUIDField(default=uuid.uuid4, editable=False, unique=True)
+    task_id = models.UUIDField(
+        default=uuid.uuid4,
+        editable=False,
+        unique=True
+    )
 
-    name = models.CharField(max_length=255, blank=True, null=True)
+    name = models.CharField(
+        max_length=255,
+        blank=True,
+        null=True
+    )
 
-    job_id = models.CharField(max_length=255, blank=True, null=True)
+    job_id = models.CharField(
+        max_length=255,
+        blank=True, null=True)
 
-    timestamp = models.DateTimeField(auto_now_add=True)
+    timestamp = models.DateTimeField(
+        auto_now_add=True
+    )
 
-    task_type = models.CharField(max_length=255, choices=TaskTypeChoices, default=TaskTypeChoices.UNDEFINED)
+    task_type = models.CharField(
+        max_length=255,
+        choices=TaskTypeChoices,
+        default=TaskTypeChoices.UNDEFINED
+    )
 
-    status = models.CharField(max_length=255, choices=TaskStatusChoices, default=TaskStatusChoices.STATUS_UNKNOWN)
+    status = models.CharField(
+        max_length=255,
+        choices=TaskStatusChoices,
+        default=TaskStatusChoices.STATUS_UNKNOWN
+    )
 
-    message = models.CharField(max_length=512, blank=True, null=True)
+    message = models.CharField(
+        max_length=512,
+        blank=True,
+        null=True
+    )
 
-    fail_reason = models.CharField(max_length=512, blank=True, null=True)
+    fail_reason = models.CharField(
+        max_length=512,
+        blank=True,
+        null=True
+    )
 
-    done = models.BooleanField(default=False)
+    done = models.BooleanField(
+        default=False
+    )
 
-    remove_unused = models.BooleanField(default=True)
+    remove_unused = models.BooleanField(
+        default=True
+    )
 
-    scheduled_time = models.DateTimeField(blank=True)
+    scheduled_time = models.DateTimeField(
+        null=True,
+        blank=True
+    )
 
-    start_time = models.DateTimeField(null=True)
+    start_time = models.DateTimeField(
+        blank=True,
+        null=True
+    )
 
-    end_time = models.DateTimeField(null=True)
+    end_time = models.DateTimeField(
+        null=True,
+        blank=True
+    )
 
-    duration = models.PositiveIntegerField(blank=True, null=True)
+    duration = models.PositiveIntegerField(
+        blank=True,
+        null=True
+    )
 
-    log = models.TextField(blank=True)
+    log = models.TextField(
+        null=True,
+        blank=True
+    )
 
-    user = models.CharField(max_length=255, blank=True)
+    user = models.CharField(
+        max_length=255,
+        blank=True,
+        null=True
+    )
 
-    domain = models.CharField(max_length=255, blank=True, null=True)
+    domain = models.CharField(
+        max_length=255,
+        blank=True,
+        null=True
+    )
 
     parent = models.ForeignKey(
         to='self',
-        on_delete=models.CASCADE,
+        on_delete=models.SET_NULL,
         blank=True,
         null=True,
     )
 
     device = models.ForeignKey(
         to="dcim.Device",
-        on_delete=models.SET_NULL,
+        on_delete=models.CASCADE,
         blank=True,
         null=True,
-        verbose_name="Node")
+        verbose_name="Node"
+    )
 
     cluster = models.ForeignKey(  # Field 'cluster' links to Netbox's 'virtualization.Cluster' model
         to="virtualization.Cluster",  # and is set to 'ForeignKey' because of it.
-        on_delete=models.SET_NULL,  # If Netbox linked object is deleted, set the field to NULL
+        on_delete=models.CASCADE,  # If Netbox linked object is deleted, set the field to NULL
         blank=True,  # Makes field optional
         null=True,  # Allows corresponding database column to be NULL (contain no value)
         verbose_name="Cluster"
@@ -190,7 +302,7 @@ class SyncTask(ModelDiffMixin, ChangeLoggedModel):
 
     virtual_machine = models.ForeignKey(
         to="virtualization.VirtualMachine",
-        on_delete=models.SET_NULL,  # linked virtual_machine cannot be deleted as long as this object exists
+        on_delete=models.CASCADE,  # linked virtual_machine cannot be deleted as long as this object exists
         blank=True,
         null=True,
         verbose_name="Proxmox VM/CT"
@@ -218,13 +330,21 @@ class SyncTask(ModelDiffMixin, ChangeLoggedModel):
         default=RemoveStatusChoices.NOT_STARTED
     )
 
+    proxmox_vm = models.ForeignKey(
+        to=ProxmoxVM,
+        on_delete=models.SET_NULL,
+        blank=True,
+        null=True,
+        verbose_name="Proxmox VM/CT"
+    )
+
     # Retrieve and filter 'ProxmoxVM' records
     objects = RestrictedQuerySet.as_manager()
 
-    def save(self, *args, **kwargs):
-        # if 'message' in self.diff or self._state.adding:
-        #     if self.log is None or self.log == '':
-        #         self.log = self.message + '\n'
-        #     else:
-        #         self.log += self.message + '\n'
-        super(SyncTask, self).save(*args, **kwargs)
+    # def save(self, *args, **kwargs):
+    #     # if 'message' in self.diff or self._state.adding:
+    #     #     if self.log is None or self.log == '':
+    #     #         self.log = self.message + '\n'
+    #     #     else:
+    #     #         self.log += self.message + '\n'
+    #     super(SyncTask, self).save(*args, **kwargs)

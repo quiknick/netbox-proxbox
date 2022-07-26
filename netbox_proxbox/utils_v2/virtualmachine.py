@@ -138,16 +138,12 @@ def base_status(netbox_vm, proxmox_vm):
     # Change status to active on Netbox if it's offline
     elif proxmox_status == 'stopped' and netbox_status == 'active':
         netbox_vm.status = 'offline'
-        netbox_vm.save()
-
         # Status updated
         status_updated = True
 
     # Change status to offline on Netbox if it's active
     elif proxmox_status == 'running' and netbox_status == 'offline':
         netbox_vm.status = 'active'
-        netbox_vm.save()
-
         # Status updated
         status_updated = True
 
@@ -170,6 +166,8 @@ def base_local_context_data(netbox_vm, proxmox_vm, PROXMOX, PROXMOX_PORT):
     proxmox_values["id"] = proxmox_vm["vmid"]  # VM ID
     proxmox_values["node"] = proxmox_vm["node"]
     proxmox_values["type"] = proxmox_vm["type"]
+    proxmox_values["vm_url"] = 'https://{}:{}/#v1:0:={}%2F{} '.format(PROXMOX, PROXMOX_PORT, proxmox_vm["type"],
+                                                                      proxmox_vm["vmid"])
 
     maxmem = int(int(proxmox_vm["maxmem"]) / 1000000000)  # Convert bytes to gigabytes
     proxmox_values["memory"] = "{} {}".format(maxmem, 'GB')  # Add the 'GB' unit of measurement
@@ -182,7 +180,6 @@ def base_local_context_data(netbox_vm, proxmox_vm, PROXMOX, PROXMOX_PORT):
     # Verify if 'local_context' is empty and if true, creates initial values.
     if current_local_context == None:
         netbox_vm.local_context_data = {"proxmox": proxmox_values}
-        netbox_vm.save()
         return True, netbox_vm
 
     # Compare current Netbox values with Porxmox values
@@ -191,7 +188,6 @@ def base_local_context_data(netbox_vm, proxmox_vm, PROXMOX, PROXMOX_PORT):
         current_local_context.update(proxmox=proxmox_values)
 
         netbox_vm.local_context_data = current_local_context
-        netbox_vm.save()
         return True, netbox_vm
 
     # If 'local_context_data' already updated
@@ -243,15 +239,6 @@ def base_resources(netbox_vm, proxmox_vm):
     elif netbox_vm.disk == None:
         netbox_vm.disk = disk_Gb
 
-    netbox_vm.save()
-    # # If new information found, save it to Netbox object.
-    # if len(new_resources_json) > 0:
-    #     resources_updated = netbox_vm.update(new_resources_json)
-    #
-    #     if resources_updated == True:
-    #         return True, netbox_vm
-    #     else:
-    #         return False, netbox_vm
     return False, netbox_vm
 
 
@@ -759,8 +746,6 @@ def base_custom_fields(netbox_vm, proxmox_vm):
         netbox_vm.custom_field_data["proxmox_id"] = proxmox_vm['vmid']
         netbox_vm.custom_field_data["proxmox_node"] = proxmox_vm['node']
         netbox_vm.custom_field_data["proxmox_type"] = proxmox_vm['type']
-
-        netbox_vm.save()
         return False, netbox_vm
     except Exception as e:
         print(e)
@@ -779,3 +764,44 @@ def get_set_interface(name, netbox_node):
         dev_interface.save()
 
     return dev_interface
+
+
+def get_set_vm(cluster, proxmox_vm):
+    cluster_name = cluster.name
+    vm_name = proxmox_vm['name']
+    vmid = proxmox_vm['vmid']
+    node = proxmox_vm['node']
+
+    netbox_vm = VirtualMachine.objects.filter(cluster__name=cluster_name, name=vm_name).first()
+    if netbox_vm is None:
+        netbox_vm = VirtualMachine.objects.filter(cluster__name=cluster_name, custom_field_data__proxmox_id=vmid,
+                                                  custom_field_data__proxmox_node=node).first()
+
+    status = 'offline'
+    if proxmox_vm['status'] == 'running':
+        status = 'active'
+    elif proxmox_vm == 'stopped':
+        status = 'offline'
+
+    if netbox_vm is None:
+        try:
+            netbox_vm = VirtualMachine(name=vm_name)
+            netbox_vm.save()
+            print("VIRTUAL MACHINE CREATED")
+            print(netbox_vm)
+
+        except Exception as e:
+            print("Error: proxbox.create.virtual_machine - {}".format(e))
+            print("[proxbox.create.virtual_machine] Creation of VM/CT failed.")
+            print(e)
+            netbox_obj = None
+
+    if netbox_vm:
+        netbox_vm.status = status
+        netbox_vm.cluster_id = cluster.id
+        netbox_vm.cluster = cluster
+        netbox_vm.save()
+        c_tag = tag()
+        netbox_vm.tags.add(c_tag)
+
+    return netbox_vm
