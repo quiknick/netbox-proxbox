@@ -9,6 +9,7 @@ the main changes are in the ability to set multi tenancy, improve information fo
 the virtual machines, these include but not limited to ip address association, better group assignation, and use of
 django
 queues in order to have a recurring synchronization with all the machines in proxbox.
+Better syncroniztion with remove machines in proxmox.
 
 **NOTE:** Although the Proxbox plugin is in development, it only use GET requests and there is no risk to harm your
 Proxmox environment by changing things incorrectly.

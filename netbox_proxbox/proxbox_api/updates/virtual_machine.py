@@ -180,63 +180,63 @@ def base_custom_fields(netbox_vm, proxmox_vm):
     custom_fields_update = {}
 
     # Check if there is 'custom_field' configured on Netbox
-    if len(netbox_vm.custom_fields) == 0:
+    if len(netbox_vm.custom_field_data) == 0:
         print("[ERROR] There's no 'Custom Fields' registered by the Netbox Plugin user")
 
     # If any 'custom_field' configured, get it and update, if necessary.
-    elif len(netbox_vm.custom_fields) > 0:
+    elif len(netbox_vm.custom_field_data) > 0:
 
         # Get current configured custom_fields
-        custom_fields_names = list(netbox_vm.custom_fields.keys())
+        custom_fields_names = list(netbox_vm.custom_field_data.keys())
 
         #
         # VERIFY IF CUSTOM_FIELDS EXISTS AND THEN UPDATE INFORMATION, IF NECESSARY.
         #
         # Custom Field 'proxmox_id'
         if 'proxmox_id' in custom_fields_names:
-            if netbox_vm.custom_fields.get("proxmox_id") != proxmox_vm['vmid']:
-                custom_fields_update["proxmox_id"] = proxmox_vm['vmid']
+            if netbox_vm.custom_field_data.get("proxmox_id") != proxmox_vm['vmid']:
+                netbox_vm.custom_field_data["proxmox_id"] = proxmox_vm['vmid']
         else:
             print("[ERROR] 'proxmox_id' custom field not registered yet or configured incorrectly]")
 
         # Custom Field 'proxmox_node'
         if 'proxmox_node' in custom_fields_names:
-            if netbox_vm.custom_fields.get("proxmox_node") != proxmox_vm['node']:
-                custom_fields_update["proxmox_node"] = proxmox_vm['node']
+            if netbox_vm.custom_field_data.get("proxmox_node") != proxmox_vm['node']:
+                netbox_vm.custom_field_data["proxmox_node"] = proxmox_vm['node']
         else:
             print("[ERROR] 'proxmox_node' custom field not registered yet or configured incorrectly")
 
         # Custom Field 'proxmox_type'
         if 'proxmox_type' in custom_fields_names:
-            if netbox_vm.custom_fields.get("proxmox_type") != proxmox_vm['type']:
-                custom_fields_update["proxmox_type"] = proxmox_vm['type']
+            if netbox_vm.custom_field_data.get("proxmox_type") != proxmox_vm['type']:
+                netbox_vm.custom_field_data["proxmox_type"] = proxmox_vm['type']
         else:
             print("[ERROR] 'proxmox_type' custom field not registered yet or configured incorrectly")
 
         # Only updates information if changes found
-        if len(custom_fields_update) > 0:
-
-            # As pynetbox does not have a way to update custom_fields, use API HTTP request
-            custom_field_updated = http_update_custom_fields(
-                domain_with_http=NETBOX,
-                token=NETBOX_TOKEN,
-                vm_id=netbox_vm.id,
-                vm_name=netbox_vm.name,
-                vm_cluster=netbox_vm.cluster.id,
-                custom_fields=custom_fields_update
-            )
-
-            # Verify HTTP reply CODE
-            if custom_field_updated != 200:
-                print(
-                    "[ERROR] Some error occured trying to update 'custom_fields' through HTTP Request. HTTP Code: {}. -> {}".format(
-                        custom_field_updated, netbox_vm.name))
-                return False, netbox_vm
-
-            else:
-                # If none error occured, considers VM updated.
-                return True, netbox_vm
-
+        # if len(custom_fields_update) > 0:
+        #
+        #     # As pynetbox does not have a way to update custom_fields, use API HTTP request
+        #     custom_field_updated = http_update_custom_fields(
+        #         domain_with_http=NETBOX,
+        #         token=NETBOX_TOKEN,
+        #         vm_id=netbox_vm.id,
+        #         vm_name=netbox_vm.name,
+        #         vm_cluster=netbox_vm.cluster.id,
+        #         custom_fields=custom_fields_update
+        #     )
+        #
+        #     # Verify HTTP reply CODE
+        #     if custom_field_updated != 200:
+        #         print(
+        #             "[ERROR] Some error occured trying to update 'custom_fields' through HTTP Request. HTTP Code: {}. -> {}".format(
+        #                 custom_field_updated, netbox_vm.name))
+        #         return False, netbox_vm
+        #
+        #     else:
+        #         # If none error occured, considers VM updated.
+        #         return True, netbox_vm
+        netbox_vm.save()
         return False, netbox_vm
 
 
