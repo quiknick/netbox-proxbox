@@ -857,6 +857,7 @@ def get_nodes_for_the_cluster(cluster_data_id, task_id, iteration=0):
 def get_cluster_data(cluster_task_id, domain, task_id, iteration=0):
     print('\n\n***>Executing get_cluster_data<***')
     cluster_sync = None
+    cluster_data = None
     try:
         msg = f'[Start getting cluster data:{cluster_task_id}:{domain}:{"none" if task_id is None else task_id}] iteration: {iteration}'
         message = f'-> {datetime.now(pytz.timezone(TIME_ZONE)).strftime("%Y-%m-%d %H:%M:%S")} - {msg}'
@@ -940,8 +941,16 @@ def get_cluster_data(cluster_task_id, domain, task_id, iteration=0):
     except Exception as e:
         print("Error: get_cluster_data-cluster-all {}".format(e))
         print(e)
+        if cluster_data:
+            cluster_data.status = TaskStatusChoices.STATUS_FAILED
+            cluster_data.fail_reason = e
+            cluster_data.save()
+            current_queue_args = [
+                cluster_data.id
+            ]
+            delay_sync(cluster_data, clean_left, current_queue_args, 1)
+
         if cluster_sync:
-            # cluster_sync.done = True
             cluster_sync.status = TaskStatusChoices.STATUS_FAILED
             cluster_sync.fail_reason = e
             cluster_sync.save()
@@ -949,6 +958,9 @@ def get_cluster_data(cluster_task_id, domain, task_id, iteration=0):
                 cluster_sync.id
             ]
             delay_sync(cluster_sync, clean_left, current_queue_args, 1)
+
+            # cluster_sync.done = True
+
             # father = SyncTask.objects.filter(id=cluster_sync.parent_id).first()
             # father.done = True
             # father.status = TaskStatusChoices.STATUS_FAILED
