@@ -283,7 +283,9 @@ def finish_await(sync_task_process_id, await_for=1):
         return
 
     # Monitor if the job has finish, if not then wait a minute and try again
-    all_children = SyncTask.objects.filter(job_id=queue_task.job_id, done=False).exclude(id=queue_task.id).count()
+    all_children = SyncTask.objects\
+        .filter(job_id=queue_task.job_id, done=False, task_type=TaskTypeChoices.REMOVE_UNUSED)\
+        .exclude(id=queue_task.id).count()
     if all_children > 0:
         current_queue_args = [queue_task.id]
         delay_sync(queue_task, finish_await, current_queue_args, await_for)
@@ -368,18 +370,7 @@ def clean_left(item_id):
                             TaskStatusChoices.STATUS_SUCCEEDED)
             return
 
-        # If the parent is none then we start with the cleaning process
-        if queue_task.parent_id is None:
-            if queue_task.finish_remove_unused == RemoveStatusChoices.NOT_STARTED:
-                queue_task.finish_remove_unused = RemoveStatusChoices.REMOVING
-                queue_task.save()
-                current_queue_args = [
-                    item_id
-                ]
-                # delay_sync(queue_task, start_removing_vms, current_queue_args, 1)
-                queue_next_sync(None, start_removing_vms, current_queue_args, 'start_removing_vms',
-                                TaskStatusChoices.STATUS_SUCCEEDED)
-            return
+
 
         # Get all children that are not finish
         all_children = SyncTask.objects.filter(parent_id=queue_task.id, done=False)
@@ -401,6 +392,19 @@ def clean_left(item_id):
             #                             TaskStatusChoices.STATUS_PAUSE)
             #     except Exception as e:
             #         print(e)
+            return
+
+        # If the parent is none then we start with the cleaning process
+        if queue_task.parent_id is None:
+            if queue_task.finish_remove_unused == RemoveStatusChoices.NOT_STARTED:
+                queue_task.finish_remove_unused = RemoveStatusChoices.REMOVING
+                queue_task.save()
+                current_queue_args = [
+                    item_id
+                ]
+                # delay_sync(queue_task, start_removing_vms, current_queue_args, 1)
+                queue_next_sync(None, start_removing_vms, current_queue_args, 'start_removing_vms',
+                                TaskStatusChoices.STATUS_SUCCEEDED)
             return
 
         # If the item  has no children then mark the item as completed
