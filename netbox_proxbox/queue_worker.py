@@ -70,8 +70,9 @@ def update_finish_sql(job_id, preserve):
 def delete_unused_sql(job_id, preserve):
     try:
         with connection.cursor() as cursor:
-            cursor.execute("DELETE from netbox_proxbox_synctask where job_id = %s and id != %s AND status != 'failed'",
-                           [job_id, preserve])
+            cursor.execute(
+                "DELETE from netbox_proxbox_synctask where job_id = %s and id != %s AND (fail_reason = '' OR fail_reason is null)",
+                [job_id, preserve])
         return True
     except Exception as e:
         print(e)
