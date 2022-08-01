@@ -425,12 +425,17 @@ def clean_left(item_id):
     except Exception as e:
         print("[ERROR] clean_left-1 - {}".format(e))
         print(e)
-        queue_task.done = True
-        queue_task.status = TaskStatusChoices.STATUS_FAILED
-        queue_task.message = e
-        queue_task.fail_reason = e
-        queue_task.save()
-        queue_task(queue_task)
+        if queue_task:
+            queue_task.done = True
+            queue_task.status = TaskStatusChoices.STATUS_FAILED
+            queue_task.message = e
+            queue_task.fail_reason = e
+            queue_task.save()
+            current_queue_args = [
+                queue_task.parent_id
+            ]
+            queue_next_sync(None, clean_left, current_queue_args, 'clean_left',
+                            TaskStatusChoices.STATUS_SUCCEEDED)
         return
 
 
