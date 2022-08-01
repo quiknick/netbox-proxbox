@@ -845,7 +845,7 @@ def get_nodes_for_the_cluster(cluster_data_id, task_id, iteration=0):
             cluster_data.fail_reason = e
             cluster_data.save()
             current_queue_args = [
-                cluster_data.parent_id
+                cluster_data.id
             ]
             delay_sync(cluster_data, clean_left, current_queue_args, 1)
             # queue_next_sync(None, clean_left, current_queue_args, 'clean_left',
@@ -945,7 +945,7 @@ def get_cluster_data(cluster_task_id, domain, task_id, iteration=0):
             cluster_sync.fail_reason = e
             cluster_sync.save()
             current_queue_args = [
-                cluster_sync.parent_id
+                cluster_sync.id
             ]
             delay_sync(cluster_sync, clean_left, current_queue_args, 1)
             # father = SyncTask.objects.filter(id=cluster_sync.parent_id).first()
