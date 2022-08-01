@@ -934,14 +934,20 @@ def get_cluster_data(cluster_task_id, domain, task_id, iteration=0):
         print("Error: get_cluster_data-cluster-all {}".format(e))
         print(e)
         if cluster_sync:
-            cluster_sync.done = True
+            # cluster_sync.done = True
             cluster_sync.status = TaskStatusChoices.STATUS_FAILED
             cluster_sync.fail_reason = e
             cluster_sync.save()
-            father = SyncTask.objects.filter(id=cluster_sync.parent_id).first()
-            father.done = True
-            father.status = TaskStatusChoices.STATUS_FAILED
-            father.save()
+            current_queue_args = [
+                cluster_sync.parent_id
+            ]
+            queue_next_sync(None, clean_left, current_queue_args, 'clean_left',
+                            TaskStatusChoices.STATUS_SUCCEEDED)
+            # father = SyncTask.objects.filter(id=cluster_sync.parent_id).first()
+            # father.done = True
+            # father.status = TaskStatusChoices.STATUS_FAILED
+            # father.save()
+
         return f'Error'
 
 
