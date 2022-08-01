@@ -70,7 +70,7 @@ def update_finish_sql(job_id, preserve):
 def delete_unused_sql(job_id, preserve):
     try:
         with connection.cursor() as cursor:
-            cursor.execute("DELETE from netbox_proxbox_synctask where job_id = %s and id != %s",
+            cursor.execute("DELETE from netbox_proxbox_synctask where job_id = %s and id != %s AND status != 'failed'",
                            [job_id, preserve])
         return True
     except Exception as e:
@@ -283,8 +283,8 @@ def finish_await(sync_task_process_id, await_for=1):
         return
 
     # Monitor if the job has finish, if not then wait a minute and try again
-    all_children = SyncTask.objects\
-        .filter(job_id=queue_task.job_id, done=False, task_type=TaskTypeChoices.REMOVE_UNUSED)\
+    all_children = SyncTask.objects \
+        .filter(job_id=queue_task.job_id, done=False, task_type=TaskTypeChoices.REMOVE_UNUSED) \
         .exclude(id=queue_task.id).count()
     if all_children > 0:
         current_queue_args = [queue_task.id]
@@ -369,8 +369,6 @@ def clean_left(item_id):
             queue_next_sync(None, clean_left, current_queue_args, 'clean_left',
                             TaskStatusChoices.STATUS_SUCCEEDED)
             return
-
-
 
         # Get all children that are not finish
         all_children = SyncTask.objects.filter(parent_id=queue_task.id, done=False)
@@ -692,9 +690,15 @@ def get_vms_for_the_node(node_task_id, task_id, iteration=0):
         # Get all VM/CTs from Proxmox
         node_vms_all = proxmox.cluster.resources.get(type='vm')
         cluster = get_set_cluster(proxmox)
+        if len(node_vms_all) < 1:
+            vm_task.done = True
+            vm_task.data_instance = node_vms_all
+            vm_task.save()
+            return
         vm_task.data_instance = node_vms_all
         vm_task.save()
         counter = 0
+
         for px_vm_each in node_vms_all:
             try:
                 # if counter > 0:
@@ -726,110 +730,126 @@ def get_vms_for_the_node(node_task_id, task_id, iteration=0):
 
 @job(QUEUE_NAME)
 def get_nodes_for_the_cluster(cluster_data_id, task_id, iteration=0):
-    print('\n\n***>Executing get_nodes_for_the_cluster<***')
-    msg = f'[Start nodes data:{cluster_data_id}:{"None" if task_id is None else task_id}] iteration: {iteration}'
-    message = f'-> {datetime.now(pytz.timezone(TIME_ZONE)).strftime("%Y-%m-%d %H:%M:%S")} - {msg}'
-    log.info(message)
-    print(message)
-    if iteration > 3:
-        return f'Canceling the job'
+    cluster_data = None
     try:
-        cluster_data = SyncTask.objects.get(id=cluster_data_id)
-    except Exception as e:
-        print("Error: update_vm_process-get_nodes_for_the_cluster - {}".format(e))
-        print(e)
-        print('SYNC JOB NOT FOUND DELAYING IN ORDER TO WAIT FOR THE DATA BASE COMMIT')
-        print(e)
-        iteration = iteration + 1
-        current_queue_args = [
-            cluster_data_id, task_id, iteration
-        ]
-        custom_delay(get_nodes_for_the_cluster, current_queue_args, None, 500)
-        return f'Delaying the job'
-    user = cluster_data.user
-    remove_unused = cluster_data.remove_unused
-    domain = cluster_data.domain
-
-    print('29. Getting or creating the node data sync job')
-    cluster_nodes = get_or_create_sync_job(task_id, user, remove_unused, TaskTypeChoices.START_NODE_SYNC)
-
-    if task_id is None or task_id == '':
-        task_id = cluster_data.id
-    print('30. Updating info for the cluster data')
-    cluster_nodes.parent = cluster_data
-    cluster_nodes.parent_id = cluster_data.id
-    cluster_nodes.name = 'Start cluster nodes'
-    cluster_nodes.domain = domain
-    cluster_nodes.status = TaskStatusChoices.STATUS_RUNNING
-    cluster_nodes.cluster_id = cluster_data.cluster_id
-    cluster_nodes.job_id = cluster_data.job_id
-    cluster_nodes.save()
-
-    cluster_all = cluster_data.data_instance
-    proxmox_cluster = cluster_all[0]
-    #
-    # NODES
-    #
-    print('\n\n\nNODES...')
-    nodes_list = []
-    node_response_list = []
-    proxmox_nodes = cluster_all[1:]
-
-    print('Finish get_cluster_data')
-    should_delay = should_delay_job_run(cluster_nodes, TaskTypeChoices.START_NODE_SYNC, domain)
-    print(f'31. Should delay the job {should_delay}')
-    if should_delay:
-        current_queue_args = [
-            cluster_data_id, task_id, 0
-        ]
-        # Run the delay process if there is already other process with the same characterics is running
-        print('32. Run the delay process if there is already other process with the same characterics is running')
-        cluster_nodes = delay_sync(cluster_nodes, start_cluster_sync, current_queue_args, 1)
-        return f'Delaying :{cluster_nodes.name}:{cluster_nodes.id}'
-    else:
-        # Run the next function (start_cluster_sync)
-        cluster_nodes_id = cluster_nodes.id
-        # Get all NODES from Proxmox
+        print('\n\n***>Executing get_nodes_for_the_cluster<***')
+        msg = f'[Start nodes data:{cluster_data_id}:{"None" if task_id is None else task_id}] iteration: {iteration}'
+        message = f'-> {datetime.now(pytz.timezone(TIME_ZONE)).strftime("%Y-%m-%d %H:%M:%S")} - {msg}'
+        log.info(message)
+        print(message)
+        if iteration > 3:
+            return f'Canceling the job'
         try:
-            proxmox_session = get_session(domain)
-            proxmox = proxmox_session.get('PROXMOX_SESSION')
+            cluster_data = SyncTask.objects.get(id=cluster_data_id)
         except Exception as e:
-            print("Error: update_vm_process-get_nodes_for_the_cluster-proxmox_session - {}".format(e))
+            print("Error: update_vm_process-get_nodes_for_the_cluster - {}".format(e))
             print(e)
+            print('SYNC JOB NOT FOUND DELAYING IN ORDER TO WAIT FOR THE DATA BASE COMMIT')
+            print(e)
+            iteration = iteration + 1
+            current_queue_args = [
+                cluster_data_id, task_id, iteration
+            ]
+            custom_delay(get_nodes_for_the_cluster, current_queue_args, None, 500)
+            return f'Delaying the job'
+        user = cluster_data.user
+        remove_unused = cluster_data.remove_unused
+        domain = cluster_data.domain
 
-        for px_node_each in proxmox_nodes:
-            try:
-                print('Nodes...')
-                print(px_node_each)
-                node_updated = get_set_nodes(
-                    proxmox_json=px_node_each,
-                    proxmox_cluster=proxmox_cluster,
-                    proxmox=proxmox,
-                    proxmox_session=proxmox_session
-                )
-                node_response_list.append(px_node_each)
-                print(px_node_each)
-            except Exception as e:
-                print("Error: get_nodes_for_the_cluster-px_node_each {}".format(e))
-                message = "OS error: {0}".format(e)
-                print(message)
-                log.error(e)
+        print('29. Getting or creating the node data sync job')
+        cluster_nodes = get_or_create_sync_job(task_id, user, remove_unused, TaskTypeChoices.START_NODE_SYNC)
 
-        cluster_nodes.data_instance = node_response_list
+        if task_id is None or task_id == '':
+            task_id = cluster_data.id
+        print('30. Updating info for the cluster data')
+        cluster_nodes.parent = cluster_data
+        cluster_nodes.parent_id = cluster_data.id
+        cluster_nodes.name = 'Start cluster nodes'
+        cluster_nodes.domain = domain
+        cluster_nodes.status = TaskStatusChoices.STATUS_RUNNING
+        cluster_nodes.cluster_id = cluster_data.cluster_id
+        cluster_nodes.job_id = cluster_data.job_id
         cluster_nodes.save()
-        print(f'33. Finish get_nodes_for_the_cluster')
 
-        get_nodes_for_the_cluster_args = [
-            cluster_nodes_id, None, 0
-        ]
-        print(f'34. Run the next function (get_nodes_for_the_cluster for {domain}) ')
-        queue_next_sync(cluster_nodes, get_vms_for_the_node, get_nodes_for_the_cluster_args,
-                        'get_vms_for_the_node')
+        cluster_all = cluster_data.data_instance
+        proxmox_cluster = cluster_all[0]
+        #
+        # NODES
+        #
+        print('\n\n\nNODES...')
+        nodes_list = []
+        node_response_list = []
+        proxmox_nodes = cluster_all[1:]
+
+        print('Finish get_cluster_data')
+        should_delay = should_delay_job_run(cluster_nodes, TaskTypeChoices.START_NODE_SYNC, domain)
+        print(f'31. Should delay the job {should_delay}')
+        if should_delay:
+            current_queue_args = [
+                cluster_data_id, task_id, 0
+            ]
+            # Run the delay process if there is already other process with the same characterics is running
+            print('32. Run the delay process if there is already other process with the same characterics is running')
+            cluster_nodes = delay_sync(cluster_nodes, start_cluster_sync, current_queue_args, 1)
+            return f'Delaying :{cluster_nodes.name}:{cluster_nodes.id}'
+        else:
+            # Run the next function (start_cluster_sync)
+            cluster_nodes_id = cluster_nodes.id
+            # Get all NODES from Proxmox
+            try:
+                proxmox_session = get_session(domain)
+                proxmox = proxmox_session.get('PROXMOX_SESSION')
+            except Exception as e:
+                print("Error: update_vm_process-get_nodes_for_the_cluster-proxmox_session - {}".format(e))
+                print(e)
+
+            for px_node_each in proxmox_nodes:
+                try:
+                    print('Nodes...')
+                    print(px_node_each)
+                    node_updated = get_set_nodes(
+                        proxmox_json=px_node_each,
+                        proxmox_cluster=proxmox_cluster,
+                        proxmox=proxmox,
+                        proxmox_session=proxmox_session
+                    )
+                    node_response_list.append(px_node_each)
+                    print(px_node_each)
+                except Exception as e:
+                    print("Error: get_nodes_for_the_cluster-px_node_each {}".format(e))
+                    message = "OS error: {0}".format(e)
+                    print(message)
+                    log.error(e)
+
+            cluster_nodes.data_instance = node_response_list
+            cluster_nodes.save()
+            print(f'33. Finish get_nodes_for_the_cluster')
+
+            get_nodes_for_the_cluster_args = [
+                cluster_nodes_id, None, 0
+            ]
+            print(f'34. Run the next function (get_nodes_for_the_cluster for {domain}) ')
+            queue_next_sync(cluster_nodes, get_vms_for_the_node, get_nodes_for_the_cluster_args,
+                            'get_vms_for_the_node')
+    except Exception as e:
+        print("Error: get_nodes_for_the_cluster- {}".format(e))
+        print(e)
+        if cluster_data:
+            cluster_data.done = True
+            cluster_data.status = TaskStatusChoices.STATUS_FAILED
+            cluster_data.fail_reason = e
+            cluster_data.save()
+            current_queue_args = [
+                cluster_data.parent_id
+            ]
+            queue_next_sync(None, clean_left, current_queue_args, 'clean_left',
+                            TaskStatusChoices.STATUS_SUCCEEDED)
 
 
 @job(QUEUE_NAME)
 def get_cluster_data(cluster_task_id, domain, task_id, iteration=0):
     print('\n\n***>Executing get_cluster_data<***')
+    cluster_sync = None
     try:
         msg = f'[Start getting cluster data:{cluster_task_id}:{domain}:{"none" if task_id is None else task_id}] iteration: {iteration}'
         message = f'-> {datetime.now(pytz.timezone(TIME_ZONE)).strftime("%Y-%m-%d %H:%M:%S")} - {msg}'
@@ -913,6 +933,15 @@ def get_cluster_data(cluster_task_id, domain, task_id, iteration=0):
     except Exception as e:
         print("Error: get_cluster_data-cluster-all {}".format(e))
         print(e)
+        if cluster_sync:
+            cluster_sync.done = True
+            cluster_sync.status = TaskStatusChoices.STATUS_FAILED
+            cluster_sync.fail_reason = e
+            cluster_sync.save()
+            father = SyncTask.objects.filter(id=cluster_sync.parent_id).first()
+            father.done = True
+            father.status = TaskStatusChoices.STATUS_FAILED
+            father.save()
         return f'Error'
 
 
