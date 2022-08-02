@@ -155,7 +155,7 @@ def base_status(netbox_vm, proxmox_vm):
     return status_updated, netbox_vm
 
 
-def base_local_context_data(netbox_vm, proxmox_vm, PROXMOX, PROXMOX_PORT):
+def base_local_context_data(netbox_vm, proxmox_vm, PROXMOX, PROXMOX_PORT, domain = None):
     current_local_context = netbox_vm.local_context_data
 
     proxmox_values = {}
@@ -166,8 +166,10 @@ def base_local_context_data(netbox_vm, proxmox_vm, PROXMOX, PROXMOX_PORT):
     proxmox_values["id"] = proxmox_vm["vmid"]  # VM ID
     proxmox_values["node"] = proxmox_vm["node"]
     proxmox_values["type"] = proxmox_vm["type"]
-    proxmox_values["vm_url"] = 'https://{}:{}/#v1:0:={}%2F{} '.format(PROXMOX, PROXMOX_PORT, proxmox_vm["type"],
+    proxmox_values["vm_url"] = 'https://{}:{}/#v1:0:={}%2F{}'.format(PROXMOX, PROXMOX_PORT, proxmox_vm["type"],
                                                                       proxmox_vm["vmid"])
+    if domain:
+        proxmox_values["domain"] = '{}'.format(domain)
 
     maxmem = int(int(proxmox_vm["maxmem"]) / 1000000000)  # Convert bytes to gigabytes
     proxmox_values["memory"] = "{} {}".format(maxmem, 'GB')  # Add the 'GB' unit of measurement
