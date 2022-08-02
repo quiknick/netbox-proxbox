@@ -380,17 +380,6 @@ def clean_left(item_id):
             ]
             delay_sync(queue_task, clean_left, current_queue_args, 1)
 
-            # for elem in all_children:
-            #     try:
-            #         if not elem.done and (not elem.task_type == TaskTypeChoices.REMOVE_UNUSED) and (
-            #                 not elem.task_type == TaskTypeChoices.REMOVE_UNUSED_STEP2):
-            #             current_queue_args = [
-            #                 elem.id
-            #             ]
-            #             queue_next_sync(queue_task, clean_left, current_queue_args, 'clean_left',
-            #                             TaskStatusChoices.STATUS_PAUSE)
-            #     except Exception as e:
-            #         print(e)
             return
 
         # If the parent is none then we start with the cleaning process
@@ -538,6 +527,7 @@ def update_vm_process(vm_info_task_id, cluster=None, proxbox_vm=None, step='fini
         proxbox_vm.save()
         vm_info_task.proxmox_vm_id = proxbox_vm.id
         vm_info_task.proxmox_vm = proxbox_vm
+        vm_info_task.save()
 
         if step == 'finish':
             print('FINISH ALL PROCESS')
@@ -699,7 +689,12 @@ def get_vms_for_the_node(node_task_id, task_id, iteration=0):
         if len(node_vms_all) < 1:
             vm_task.done = True
             vm_task.data_instance = node_vms_all
+            vm_task.fail_reason = 'No virtual machines found for the cluster'
             vm_task.save()
+            current_queue_args = [
+                vm_task.id
+            ]
+            delay_sync(vm_task, clean_left, current_queue_args, 1)
             return
         vm_task.data_instance = node_vms_all
         vm_task.save()
@@ -709,11 +704,9 @@ def get_vms_for_the_node(node_task_id, task_id, iteration=0):
             try:
                 # if counter > 0:
                 #     break
-                # if not (px_vm_each['name'] == 'ATRO-001-BOG' or px_vm_each['name'] == 'E1-0.co.ntp.edgeuno.com' or
-                #         px_vm_each['name'] == 'colombiabridge'):
+                # if not (px_vm_each['name'] == 'E1-'):
                 #     continue
-                # if not (px_vm_each['name'] == 'E1-kali-sofia'):
-                #     continue
+
                 print(px_vm_each)
                 is_template = px_vm_each.get("template")
                 if is_template == 1:
