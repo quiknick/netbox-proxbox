@@ -98,7 +98,7 @@ def queue_next_sync(
         next_queue_function_string=None,
         task_Status=None
 ):
-    print('15. Queueing the next execution')
+    # print('15. Queueing the next execution')
     # if sync_task is None:
     #     print('The task is none')
     #     raise Exception("Object sync_task can't be None")
@@ -118,7 +118,7 @@ def queue_next_sync(
             sync_task.status = status
             sync_task.message = message
             sync_task.scheduled_time = (datetime.now()).replace(microsecond=0, tzinfo=pytz.utc)
-            print('16. Save the task')
+            # print('16. Save the task')
             sync_task.save()
     except Exception as e:
         print("Error: queue_next_sync-1 - {}".format(e))
@@ -141,7 +141,7 @@ def queue_next_sync(
         print("Error: queue_next_sync-2 - {}".format(e))
         print(e)
         raise e
-    print(f'17. Next task successfully queue with id: {queue_job.id}')
+    # print(f'17. Next task successfully queue with id: {queue_job.id}')
     return sync_task
 
 
@@ -153,14 +153,14 @@ def get_or_create_sync_job(
         message='New synchronization job'
 
 ):
-    print('2. Start get_or_create_sync_job function')
+    # print('2. Start get_or_create_sync_job function')
     try:
         # try to get the sync job, if the task_id is none or the sync job doesn't exists prepare everything to create
         # a new one
         if task_id is None or task_id == '':
             sync_job = None
         else:
-            print(f'24. Trying to the get the sync job with id: {task_id}')
+            # print(f'24. Trying to the get the sync job with id: {task_id}')
             sync_job = SyncTask.objects.get(id=task_id)
     except Exception as e:
         print("Error: get_or_create_sync_job-1 - {}".format(e))
@@ -170,7 +170,7 @@ def get_or_create_sync_job(
     if sync_job is None:
         if task_type is None or task_type == '':
             task_type = TaskTypeChoices.START_SYNC
-        print(f'23. Creating new sync job for {task_type}')
+        # print(f'23. Creating new sync job for {task_type}')
         sync_job = SyncTask(
             task_type=task_type,
             done=False,
@@ -192,18 +192,18 @@ def should_delay_job_run(
         task_type,
         domain=None
 ):
-    print('3. If possible only run one synchronization at the time')
+    # print('3. If possible only run one synchronization at the time')
     # If possible only run one synchronization at the time
     # get all running task that have type START_SYNC
     if domain is None:
-        print('4. get all running task that have type START_SYNC no Domain')
+        # print('4. get all running task that have type START_SYNC no Domain')
         running_job = SyncTask.objects.filter(
             task_type=task_type,
             done=False,
             status=TaskStatusChoices.STATUS_RUNNING
         )
     else:
-        print('4. get all running task that have type START_SYNC')
+        # print('4. get all running task that have type START_SYNC')
         running_job = SyncTask.objects.filter(
             task_type=task_type,
             done=False,
@@ -211,12 +211,12 @@ def should_delay_job_run(
             status=TaskStatusChoices.STATUS_RUNNING
         )
     # Count how many task are running
-    print('5. Count how many task are running')
+    # print('5. Count how many task are running')
     total_running_jobs = running_job.count()
-    print(f'6. Running task {total_running_jobs}')
+    # print(f'6. Running task {total_running_jobs}')
 
     # Get the task by its task_id if no task_id is set then it will be created later
-    print('7. Get the task by its task_id if no task_id is set then it will be created later')
+    # print('7. Get the task by its task_id if no task_id is set then it will be created later')
     for job in running_job:
         if sync_task is not None:
             if sync_task.id == job.id:
