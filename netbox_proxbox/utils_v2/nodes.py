@@ -45,32 +45,41 @@ def create_node(proxmox, proxmox_node, proxmox_session=None):
         role_name = proxmox_session.get('NETBOX_NODE_ROLE_NAME', role_name)
 
     # Create json with basic NODE information
-
-    node_json = {}
-    node_json["name"] = proxmox_node['name']
-    node_json["device_role"] = get_set_role(role_id=role_id, role_name=role_name).id
-    node_json["device_type"] = get_set_device_type().id
-    node_json["site"] = get_set_site(site_id=site_id, site_name=site_name).id
-    node_json["status"] = 'active'
-    node_json["tags"] = [tag().id]
-    node_json["cluster"] = get_set_cluster(proxmox).id
-
     # Create Node with json 'node_json'
     try:
-        netbox_obj = Device(node_json)
+        node_json = {}
+        name = proxmox_node['name']
+        device_role = get_set_role(role_id=role_id, role_name=role_name)
+        device_type = get_set_device_type()
+        site = get_set_site(site_id=site_id, site_name=site_name)
+        cluster = get_set_cluster(proxmox)
 
+        netbox_obj = Device(
+            name=name
+        )
+
+        netbox_obj.device_role = device_role
+        netbox_obj.device_role_id = device_role.id
+
+        netbox_obj.device_type = device_type
+        netbox_obj.device_type_id = device_type.id
+
+        netbox_obj.site = site
+        netbox_obj.site_id = site.id
+        netbox_obj.status = 'active'
+        netbox_obj.cluster = cluster
+        netbox_obj.cluster_id = cluster.id
+        netbox_obj.save()
     except Exception as e:
-        print(e)
         print("[proxbox_api.create.node] Creation of NODE failed.")
-        netbox_obj = None
-
+        print(e)
+        # In case nothing works, returns error
+        return None
     else:
+        if netbox_obj:
+            c_tag = tag()
+            netbox_obj.tags.add(c_tag)
         return netbox_obj
-
-    # In case nothing works, returns error
-    netbox_obj = None
-    return netbox_obj
-
 
 def status(netbox_node, proxmox_node):
     #
@@ -160,9 +169,10 @@ def get_set_interface(name, netbox_node):
         # new_interface_json = {"device_id": netbox_node.id, "name": name, type: InterfaceTypeChoices.TYPE_LAG}
         dev_interface = Interface(
             name=name,
-            form_factor=0,
+            # form_factor=0,
             description="LAG",
-            device=netbox_node.id,
+            device=netbox_node,
+            device_id=netbox_node.id,
             type=InterfaceTypeChoices.TYPE_LAG
         )
         dev_interface.save()
@@ -177,33 +187,37 @@ def interface_ip_assign(netbox_node, proxmox_json):
         node_interface = get_set_interface('Bond0', netbox_node)
         # netbox_ip = nb.ipam.ip_addresses.get(address=ip)
         netbox_ip = IPAddress.objects.filter(address=ip).first()
-
+        content_type = ContentType.objects.filter(app_label="dcim", model="interface").first()
         if netbox_ip is None:
             # Create the ip address and link it to the interface previously created
-            address = {
-                "address": ip,
-                "assigned_object_type": "dcim.interface",
-                "assigned_object_id": node_interface.id
-            }
-            netbox_ip = IPAddress(address)
+            netbox_ip = IPAddress(
+                address=ip
+            )
+            netbox_ip.assigned_object_type = content_type  # "dcim.interface"
+            netbox_ip.assigned_object_id = node_interface.id
+            netbox_ip.assigned_object = node_interface
             netbox_ip.save()
         else:
             try:
-                content_type = ContentType.objects.filter(app_label="dcim", model="interface").first()
+
                 netbox_ip.assigned_object_type = content_type  # "dcim.interface"
                 netbox_ip.assigned_object_id = node_interface.id
                 netbox_ip.assigned_object = node_interface
                 netbox_ip.save()
             except Exception as e:
                 print("Error: interface_ip_assign-update - {}".format(e))
-                print('')
+                # print('')
                 print(e)
         # Associate the ip address to the vm
+        # Reload the ip in order to get the correct family version
+        netbox_ip = IPAddress.objects.filter(address=ip).first()
         netbox_node.primary_ip_id = netbox_ip.id
         if netbox_ip.family == 4:
             netbox_node.primary_ip4 = netbox_ip
+            netbox_node.primary_ip4_id = netbox_ip.id
         else:
             netbox_node.primary_ip6 = netbox_ip
+            netbox_node.primary_ip6_id = netbox_ip.id
         netbox_node.save()
         return True
     except Exception as e:

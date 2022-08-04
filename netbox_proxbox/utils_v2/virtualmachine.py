@@ -21,7 +21,7 @@ try:
     )
 
     from .cluster import get_set_cluster
-    from .extras import tag
+    from .extras import tag, custom_tag
     import re
 
 
@@ -34,7 +34,7 @@ ipv6_regex = r"([a-zA-Z0-9]{1,4}(:[a-zA-Z0-9]{0,4})?(:[a-zA-Z0-9]{0,4})?(:[a-zA-
 
 
 def get_nb_vm_by_data(cluster_name, vmid, node):
-    print('[OK] Getting getting vm from netbox for {} , {}, {}'.format(cluster_name, vmid, node))
+    # print('[OK] Getting getting vm from netbox for {} , {}, {}'.format(cluster_name, vmid, node))
     netbox_vm = VirtualMachine.objects.filter(cluster__name=cluster_name, custom_field_data__proxmox_id=vmid,
                                               custom_field_data__proxmox_node=node).first()
     # netbox_vm = None
@@ -106,8 +106,8 @@ def virtual_machine(proxmox, proxmox_vm):
         print(netbox_obj)
 
     except Exception as e:
-        print("Error: proxbox.create.virtual_machine - {}".format(e))
-        print("[proxbox.create.virtual_machine] Creation of VM/CT failed.")
+        print("Error: virtual.proxbox.create.virtual_machine - {}".format(e))
+        print("[virtual.proxbox.create.virtual_machine] Creation of VM/CT failed.")
         print(e)
         netbox_obj = None
 
@@ -155,7 +155,7 @@ def base_status(netbox_vm, proxmox_vm):
     return status_updated, netbox_vm
 
 
-def base_local_context_data(netbox_vm, proxmox_vm, PROXMOX, PROXMOX_PORT, domain = None):
+def base_local_context_data(netbox_vm, proxmox_vm, PROXMOX, PROXMOX_PORT, domain=None):
     current_local_context = netbox_vm.local_context_data
 
     proxmox_values = {}
@@ -167,7 +167,7 @@ def base_local_context_data(netbox_vm, proxmox_vm, PROXMOX, PROXMOX_PORT, domain
     proxmox_values["node"] = proxmox_vm["node"]
     proxmox_values["type"] = proxmox_vm["type"]
     proxmox_values["vm_url"] = 'https://{}:{}/#v1:0:={}%2F{}'.format(PROXMOX, PROXMOX_PORT, proxmox_vm["type"],
-                                                                      proxmox_vm["vmid"])
+                                                                     proxmox_vm["vmid"])
     if domain:
         proxmox_values["domain"] = '{}'.format(domain)
 
@@ -245,23 +245,23 @@ def base_resources(netbox_vm, proxmox_vm):
 
 
 def get_ip(test_str):
-    print('[OK] parsing ipv4. -> {}'.format(test_str))
+    # print('[OK] parsing ipv4. -> {}'.format(test_str))
     regex = r"ip=" + ipv4_regex
     # test_str = "name=eth0,bridge=vmbr504,firewall=1,gw=172.16.19.1,hwaddr=5A:70:3F:05:0D:AC,ip=172.16.19.251/24,type=veth"
     try:
         matches = re.finditer(regex, test_str, re.MULTILINE)
         it = matches.__next__()
         ip = it.group().replace('ip=', '').strip()
-        print('[OK] Parse. -> {}'.format(ip))
+        # print('[OK] Parse. -> {}'.format(ip))
         return ip
     except Exception as e:
-        print("Error: get_ip - {}".format(e))
+        # print("Error: get_ip - {}".format(e))
         return None
 
 
 def get_ipv6(test_str):
     # ipv6 regex
-    print('[OK] parsing ipv6. -> {}'.format(test_str))
+    # print('[OK] parsing ipv6. -> {}'.format(test_str))
     regex = r"ip6=" + ipv6_regex
 
     # test_str = "name=eth0,bridge=vmbr502,gw=172.16.17.1,gw6=fc00:16:17::1,hwaddr=CA:F3:00:D6:31:2A,ip=172.16.17.203/24,ip6=2001:db8:3:4::192.0.2.33/64,type=veth"
@@ -269,40 +269,67 @@ def get_ipv6(test_str):
         matches = re.finditer(regex, test_str, re.MULTILINE | re.IGNORECASE)
         it = matches.__next__()
         ip = it.group().replace('ip6=', '').strip()
-        print('[OK] Parse. -> {}'.format(ip))
+        # print('[OK] Parse. -> {}'.format(ip))
         return ip
     except Exception as e:
-        print("Error: get_ipv6 - {}".format(e))
+        # print("Error: get_ipv6 - {}".format(e))
         return None
+
+
+def handle_ip_already_set(netbox_vm, netbox_ip, family=4):
+    netbox_vm_with_ip = None
+    # Check for ipv4 or ipv6 if there is a vm with the same ip
+    if family == 4:
+        netbox_vm_with_ip = VirtualMachine.objects.filter(primary_ip4_id=netbox_ip.id).first()
+    else:
+        netbox_vm_with_ip = VirtualMachine.objects.filter(primary_ip6_id=netbox_ip.id).first()
+    # If there is not vm with the ip or is the same as the incoming vm
+    if netbox_vm_with_ip is None or netbox_vm.id == netbox_vm_with_ip.id:
+        return True, netbox_vm, netbox_ip
+    # If the netbox_vm is not the same as the netbox_vm_with_ip then we are going to set up a tag and a comment
+    # with the ip and the vm id that has the same ip
+    name = 'Repeated Ip'
+    tag_description = "No description"
+    color = 'ff3c3f'
+    repeated_tag = custom_tag(name, slugify(name), tag_description, color)
+    if repeated_tag:
+        netbox_vm.tags.add(repeated_tag)
+    netbox_vm.comments = netbox_vm.comments + '\nDuplicated ip - Name: {} - id {}'.format(netbox_vm_with_ip.name,
+                                                                                          netbox_vm_with_ip.id)
+    netbox_vm.save()
+    return False, netbox_vm, None
 
 
 def set_ipv(netbox_vm, vm_interface, ip, family=4):
     if ip is not None:
+        # Search the ip in netbox and get the content type for virtualization
         netbox_ip = IPAddress.objects.filter(address=ip).first()
         content_type = ContentType.objects.filter(app_label="virtualization", model="vminterface").first()
         if netbox_ip is None:
             # Create the ip address and link it to the interface previously created
             netbox_ip = IPAddress(address=ip)
-            netbox_ip.assigned_object_type = content_type  # "dcim.interface"
+            netbox_ip.assigned_object_type = content_type
             netbox_ip.assigned_object_id = vm_interface.id
             netbox_ip.assigned_object = vm_interface
             netbox_ip.save()
-            # Associate the ip address to the vm
-            netbox_vm.primary_ip_id = netbox_ip.id
-            netbox_vm.primary_ip4 = netbox_ip
+
+            # netbox_vm.primary_ip_id = netbox_ip.id
+            # netbox_vm.primary_ip4 = netbox_ip
             # netbox_vm.save()
-
+        r, netbox_vm, netbox_ip = handle_ip_already_set(netbox_vm, netbox_ip, family)
         if netbox_ip:
-
-            netbox_ip.assigned_object_type = content_type  # "dcim.interface"
+            # Associate the ip address to the interface
+            netbox_ip.assigned_object_type = content_type
             netbox_ip.assigned_object_id = vm_interface.id
             netbox_ip.assigned_object = vm_interface
             netbox_ip.save()
 
             if family == 4:
                 netbox_vm.primary_ip4 = netbox_ip
+                netbox_vm.primary_ip4_id = netbox_ip.id
             else:
                 netbox_vm.primary_ip6 = netbox_ip
+                netbox_vm.primary_ip6_id = netbox_ip.id
 
             netbox_vm.primary_ip_id = netbox_ip.id
 
@@ -323,7 +350,7 @@ def get_main_ip(test_str):
     ipv6 = None
 
     try:
-        print('[OK] Parsing main ip for ipv4 -> {}').format(test_str)
+        # print('[OK] Parsing main ip for ipv4 -> {}').format(test_str)
         rgx = r"main(\s)?ip:(\s)?"
         matches = re.finditer(rgx + ipv4_regex, test_str, re.MULTILINE | re.IGNORECASE)
         it = matches.__next__()
@@ -335,10 +362,10 @@ def get_main_ip(test_str):
             .strip()
         ipv4 = (re.sub(rgx, '', ipv4)).strip()
     except Exception as e:
-        print("Error: get_main_ip-ip4 - {}".format(e))
+        # print("Error: get_main_ip-ip4 - {}".format(e))
         pass
     try:
-        print('[OK] Parsing main ip for ipv6')
+        # print('[OK] Parsing main ip for ipv6')
         rgx = r"main(\s)?ip:(\s)?"
         matches = re.finditer(rgx + ipv6_regex, test_str, re.MULTILINE | re.IGNORECASE)
         it = matches.__next__()
@@ -350,11 +377,11 @@ def get_main_ip(test_str):
             .strip()
         ipv6 = (re.sub(rgx, '', ipv6)).strip()
     except Exception as e:
-        print("Error: get_main_ip-ip6 - {}".format(e))
+        # print("Error: get_main_ip-ip6 - {}".format(e))
         pass
     try:
         if ipv4 is None:
-            print('[OK] Parsing ip address allocation for ipv4')
+            # print('[OK] Parsing ip address allocation for ipv4')
             rgx = r"ip(\s)?address(\s)?allocation:(\s)?"
             matches = re.finditer(rgx + ipv4_regex, test_str, re.MULTILINE | re.IGNORECASE)
             it = matches.__next__()
@@ -368,11 +395,11 @@ def get_main_ip(test_str):
                 .strip()
             ipv4 = (re.sub(rgx, '', ipv4)).strip()
     except Exception as e:
-        print("Error: get_main_ip-ip4-location - {}".format(e))
+        # print("Error: get_main_ip-ip4-location - {}".format(e))
         pass
     try:
         if ipv6 is None:
-            print('[OK] Parsing ip address allocation for ipv6')
+            # print('[OK] Parsing ip address allocation for ipv6')
             rgx = r"ip(\s)?address(\s)?allocation:(\s)?"
             matches = re.finditer(rgx + ipv6_regex, test_str, re.MULTILINE | re.IGNORECASE)
             it = matches.__next__()
@@ -386,7 +413,7 @@ def get_main_ip(test_str):
                 .strip()
             ipv6 = (re.sub(rgx, '', ipv6)).strip()
     except Exception as e:
-        print("Error: get_main_ip-ip6-allocation - {}".format(e))
+        # print("Error: get_main_ip-ip6-allocation - {}".format(e))
         pass
     return ipv4, ipv6
 
@@ -402,10 +429,10 @@ def base_add_ip(proxmox, netbox_vm, proxmox_vm):
     try:
         if vm_type == 'qemu':
             config = proxmox.nodes(node).qemu(vmid).config.get()
-            print('[OK] Got Configuration for quemu. -> {}'.format(vmid))
+            # print('[OK] Got Configuration for quemu. -> {}'.format(vmid))
         if vm_type == 'lxc':
             config = proxmox.nodes(node).lxc(vmid).config.get()
-            print('[OK] Got Configuration for lxc. -> {}'.format(vmid))
+            # print('[OK] Got Configuration for lxc. -> {}'.format(vmid))
     except  Exception as e:
         print("Error: base_add_ip-1 - {}".format(e))
         print(e)
@@ -434,14 +461,13 @@ def base_add_ip(proxmox, netbox_vm, proxmox_vm):
             ipv4 = get_ip(network_str)
             ipv6 = get_ipv6(network_str)
             if ipv4 is None and ipv6 is None:
-                print('[OK] ipv4 or ipv6 not found searching in the observations for . -> {}'.format(vmid))
+                # print('[OK] ipv4 or ipv6 not found searching in the observations for . -> {}'.format(vmid))
                 if 'description' in config:
                     ipv4, ipv6 = get_main_ip(config['description'])
             if not (ipv4 is None and ipv6 is None):
-                name = 'eth0'
-                # Create the interface if doesn't exists
                 try:
-                    vm_interface = get_set_interface(name, netbox_vm)
+                    # Create the interface if it doesn't exist
+                    vm_interface = get_set_interface('eth0', netbox_vm)
                     netbox_vm = set_ipv6(netbox_vm, vm_interface, ipv6)
                     netbox_vm = set_ipv4(netbox_vm, vm_interface, ipv4)
                 except Exception as e:
@@ -504,8 +530,8 @@ def client_tenant_parser(test_str):
         try:
             m_result = re.finditer(sub_str_regex, client, re.MULTILINE | re.IGNORECASE).__next__().group().strip()
         except Exception as e:
-            print("Error: client_tenant_parser - {}".format(e))
-            print(e)
+            # print("Error: client_tenant_parser - {}".format(e))
+            # print(e)
             pass
         if m_result:
             if m_result.replace('(', '').replace(')', '').strip():
@@ -513,9 +539,9 @@ def client_tenant_parser(test_str):
             client = client.replace(m_result, '').strip()
         else:
             tenant_name = client
-        print('[OK] Tenant parse. -> {}'.format(client))
+        # print('[OK] Tenant parse. -> {}'.format(client))
     except Exception as e:
-        print("Error: client_tenant_parser-all - {}".format(e))
+        # print("Error: client_tenant_parser-all - {}".format(e))
         pass
     return tenant_name, client
 
@@ -524,7 +550,7 @@ def contact_parse_set(test_str, name):
     contact = None
     contact_role = None
     try:
-        print('[OK] Parsing contact from. -> {}'.format(test_str))
+        # print('[OK] Parsing contact from. -> {}'.format(test_str))
         contact_email = None
         contact_regex = r"email(\s)?(:)?(\s)?\w+([\.-]?\w+)*@\w+([\.-]?\w+)*(\.\w{2,3})+"
         try:
@@ -536,25 +562,31 @@ def contact_parse_set(test_str, name):
                 .replace('Email:', '') \
                 .replace('Email :', '') \
                 .strip()
-            print('[OK] Contact email parsed. -> {}'.format(contact_email))
+            # print('[OK] Contact email parsed. -> {}'.format(contact_email))
         except Exception as e:
-            print("Error: contact_parse_set - {}".format(e))
-            print(e)
+            # print("Error: contact_parse_set - {}".format(e))
+            # print(e)
+            pass
         if contact_email is None:
             return None, None
 
         contact = Contact.objects.filter(email=contact_email).first()
         if contact is None:
-            print('[OK] Creating contact for {} with email {}'.format(name, contact_email))
-            new_contact = {"name": name, "email": contact_email}
-            contact = Contact(new_contact)
+            # print('[OK] Creating contact for {} with email {}'.format(name, contact_email))
+            # new_contact = {"name": name, "email": contact_email}
+            contact = Contact(
+                name=name,
+                email=contact_email
+            )
             contact.save()
 
         contact_role = ContactRole.objects.filter(name="vm").first()
         if contact_role is None:
-            print('[OK] Creating role. -> {}'.format("vm"))
-            new_contact_role = {"name": "vm", "slug": slugify("vm")}
-            contact_role = ContactRole(new_contact_role)
+            # print('[OK] Creating role. -> {}'.format("vm"))
+            contact_role = ContactRole(
+                name="vm",
+                slug=slugify("vm")
+            )
             contact_role.save()
     except Exception as e:
         print("Error: contact_parse_set - {}".format(e))
@@ -581,18 +613,19 @@ def set_assign_contact(test_str, name, object_id, content_type):
             role_id=contact_role.id
         ).first()
         if contact_assigment is None:
-            print('[OK] Assigning contact {} to tenant {}'.format(contact.name, name))
+            # print('[OK] Assigning contact {} to tenant {}'.format(contact.name, name))
 
             contact_assigment = ContactAssignment(
                 object_id=object_id,
-                contact=contact.id,
+                contact=contact,
                 content_type_id=content_type.id,
                 contact_id=contact.id,
-                role=contact_role.id,
+                role=contact_role,
+                role_id=contact_role.id,
                 priority="primary"
             )
             contact_assigment.save()
-            print('[OK] Contact assigned {} to tenant {}'.format(contact.name, name))
+            # print('[OK] Contact assigned {} to tenant {}'.format(contact.name, name))
             # assign_contact_to_tenant(tenant, contact, contact_role, content_type)
     except Exception as e:
         print("Error: set_assign_contact - {}".format(e))
@@ -629,7 +662,7 @@ def get_set_tenant_from_configuration(test_str):
 
 
 def set_tenant(netbox_vm, observation):
-    print('[OK] Getting tenant from. -> {}'.format(observation))
+    # print('[OK] Getting tenant from. -> {}'.format(observation))
     tenant = get_set_tenant_from_configuration(observation)
     if tenant is None:
         return netbox_vm
@@ -637,8 +670,7 @@ def set_tenant(netbox_vm, observation):
 
     netbox_vm.tenant_id = tenant.id
     netbox_vm.tenant = tenant
-    if observation:
-        netbox_vm.comments = observation
+
     netbox_vm.save()
 
     return netbox_vm
@@ -648,7 +680,7 @@ def set_contact_to_vm(test_str, netbox_vm):
     # content_type = 'virtualization.virtualmachine'
     content_type = ContentType.objects.filter(app_label="virtualization", model="virtualmachine").first()
     try:
-        print('[OK] Parsing contact from. -> {}'.format(test_str))
+        # print('[OK] Parsing contact from. -> {}'.format(test_str))
         tenant = netbox_vm.tenant
         tenant_name, client = client_tenant_parser(test_str)
         set_assign_contact(test_str, client, netbox_vm.id, content_type)
@@ -668,8 +700,10 @@ def default_tenant(netbox_vm):
         it.group().lower().strip()
         has_string = True
     except Exception as e:
-        print("Error: default_tenant-1 - {}".format(e))
-        print(e)
+        pass
+        # print("Error: default_tenant-1 - {}".format(e))
+        # print(e)
+
     if has_string:
         if NETBOX_TENANT_NAME is not None:
             nb_tenant = Tenant.objects.filter(name=NETBOX_TENANT_NAME).first()
@@ -702,10 +736,10 @@ def base_add_configuration(proxmox, netbox_vm, proxmox_vm):
     try:
         if vm_type == 'qemu':
             config = proxmox.nodes(node).qemu(vmid).config.get()
-            print('[OK] Got Configuration for quemu. -> {}'.format(vmid))
+            # print('[OK] Got Configuration for quemu. -> {}'.format(vmid))
         if vm_type == 'lxc':
             config = proxmox.nodes(node).lxc(vmid).config.get()
-            print('[OK] Got Configuration for lxc. -> {}'.format(vmid))
+            # print('[OK] Got Configuration for lxc. -> {}'.format(vmid))
     except Exception as e:
         print("Error: base_add_configuration-2 - {}".format(e))
         print(e)
@@ -716,10 +750,12 @@ def base_add_configuration(proxmox, netbox_vm, proxmox_vm):
 
     try:
         if 'description' in config:
+            if config['description']:
+                netbox_vm.comments = config['description']
             netbox_vm = set_tenant(netbox_vm, config['description'])
             netbox_vm = set_contact_to_vm(config['description'], netbox_vm)
-        else:
-            print('no description')
+        # else:
+            # print('no description')
     except Exception as e:
         print("Error: base_add_configuration-3 - {}".format(e))
         print(e)
@@ -788,13 +824,15 @@ def get_set_vm(cluster, proxmox_vm):
     if netbox_vm is None:
         try:
             netbox_vm = VirtualMachine(name=vm_name)
+            netbox_vm.cluster_id = cluster.id
+            netbox_vm.cluster = cluster
             netbox_vm.save()
             print("VIRTUAL MACHINE CREATED")
             print(netbox_vm)
 
         except Exception as e:
-            print("Error: proxbox.create.virtual_machine - {}".format(e))
-            print("[proxbox.create.virtual_machine] Creation of VM/CT failed.")
+            print("Error: get_set_vm - {}".format(e))
+            print("[get_set_vm] Creation of VM/CT failed.")
             print(e)
             netbox_obj = None
 

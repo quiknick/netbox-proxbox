@@ -175,7 +175,6 @@ def node(proxmox, proxmox_node, proxmox_session=None):
         netbox_obj = nb.dcim.devices.create(node_json)
 
     except:
-        print("[proxbox_api.create.node] Creation of NODE failed.")
         netbox_obj = None
 
     else:

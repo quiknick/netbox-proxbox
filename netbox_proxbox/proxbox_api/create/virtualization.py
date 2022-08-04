@@ -113,8 +113,8 @@ def virtual_machine(proxmox, proxmox_vm):
         print(netbox_obj)
 
     except Exception as e:
-        print("Error: proxbox.create.virtual_machine - {}".format(e))
-        print("[proxbox.create.virtual_machine] Creation of VM/CT failed.")
+        print("Error: vm.proxbox.create.virtual_machine - {}".format(e))
+        print("[vm.proxbox.create.virtual_machine] Creation of VM/CT failed.")
         print(e)
         netbox_obj = None
 

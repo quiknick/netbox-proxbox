@@ -38,10 +38,11 @@ def get_set_device_type():
                 tags=[tag().id]
             )
             device_type.save()
-        except:
+        except Exception as e:
             msg = "Error creating the '{0}' device type. Possible errors: the model '{0}' or slug '{1}' is already used.".format(
                 proxbox_device_type_model, proxbox_device_type_slug)
             print(msg)
+            print(e)
             return msg
 
     else:
