@@ -504,8 +504,8 @@ def update_vm_process(vm_info_task_id, cluster=None, proxbox_vm=None, step='fini
             resources_updated, netbox_vm = base_resources(netbox_vm, proxmox_json)
             # print(resources_updated)
             netbox_vm.save()
-            print("[OK] Updated 'status', 'tags', 'custom_fields', 'local_context_data', 'resources' for: {}-{}".format(
-                netbox_vm.name, netbox_vm.id))
+            # print("[OK] Updated 'status', 'tags', 'custom_fields', 'local_context_data', 'resources' for: {}-{}".format(
+            #     netbox_vm.name, netbox_vm.id))
             next_step = 'add_config'
         elif step == 'add_config':
             # print("===>Update configuration")
@@ -742,8 +742,8 @@ def get_vms_for_the_node(node_task_id, task_id, iteration=0):
 
                 # print(f'34. Run the next function (process_vm_info for {domain}) ')
                 # print(process_vm_info_args)
-                print('vm for the domain {}'.format(domain))
-                print(px_vm_each)
+                # print('\nvm for the domain {}'.format(domain))
+                # print(px_vm_each)
                 counter = counter + 1
                 queue_next_sync(vm_task, process_vm_info, process_vm_info_args, 'process_vm_info')
 
