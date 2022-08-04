@@ -57,15 +57,15 @@ def delay_sync(
         schedule_args,
         plus_time=5
 ):
-    print('10. Delaying the current execution')
+    # print('10. Delaying the current execution')
     if sync_task is None:
         raise Exception("Object sync_task can't be None")
 
     status = TaskStatusChoices.STATUS_SCHEDULED
-    msg = f'Delaying the run by {plus_time} minutes'
+    msg = f'[OK] Delaying the run by {plus_time} minutes'
     message = f'-> {datetime.now(pytz.timezone(TIME_ZONE)).strftime("%Y-%m-%d %H:%M:%S")} - {msg}'
     log.info(message)
-    print(message)
+    # print(message)
     now = datetime.now()
 
     # next execution
@@ -73,7 +73,7 @@ def delay_sync(
     sync_task.status = status
     sync_task.message = message
     sync_task.scheduled_time = now_plus_time
-    print('11. Save the task')
+    # print('11. Save the task')
     sync_task.save()
 
     # Schedule the execution
@@ -86,7 +86,7 @@ def delay_sync(
     # )
     # sync_task.job_id = schedule_job.id
     # sync_task.save()
-    print(f'13. Next task successfully queue with id: {schedule_job.id}')
+    # print(f'13. Next task successfully queue with id: {schedule_job.id}')
 
     return sync_task
 
@@ -98,7 +98,7 @@ def queue_next_sync(
         next_queue_function_string=None,
         task_Status=None
 ):
-    print('15. Queueing the next execution')
+    # print('15. Queueing the next execution')
     # if sync_task is None:
     #     print('The task is none')
     #     raise Exception("Object sync_task can't be None")
@@ -112,13 +112,13 @@ def queue_next_sync(
         msg = msg + next_queue_function_string
     message = f'-> {datetime.now(pytz.timezone(TIME_ZONE)).strftime("%Y-%m-%d %H:%M:%S")} - {msg}'
     log.info(message)
-    print(message)
+    # print(message)
     try:
         if sync_task is not None:
             sync_task.status = status
             sync_task.message = message
             sync_task.scheduled_time = (datetime.now()).replace(microsecond=0, tzinfo=pytz.utc)
-            print('16. Save the task')
+            # print('16. Save the task')
             sync_task.save()
     except Exception as e:
         print("Error: queue_next_sync-1 - {}".format(e))
@@ -141,7 +141,7 @@ def queue_next_sync(
         print("Error: queue_next_sync-2 - {}".format(e))
         print(e)
         raise e
-    print(f'17. Next task successfully queue with id: {queue_job.id}')
+    # print(f'17. Next task successfully queue with id: {queue_job.id}')
     return sync_task
 
 
@@ -153,14 +153,14 @@ def get_or_create_sync_job(
         message='New synchronization job'
 
 ):
-    print('2. Start get_or_create_sync_job function')
+    # print('2. Start get_or_create_sync_job function')
     try:
         # try to get the sync job, if the task_id is none or the sync job doesn't exists prepare everything to create
         # a new one
         if task_id is None or task_id == '':
             sync_job = None
         else:
-            print(f'24. Trying to the get the sync job with id: {task_id}')
+            # print(f'24. Trying to the get the sync job with id: {task_id}')
             sync_job = SyncTask.objects.get(id=task_id)
     except Exception as e:
         print("Error: get_or_create_sync_job-1 - {}".format(e))
@@ -170,7 +170,7 @@ def get_or_create_sync_job(
     if sync_job is None:
         if task_type is None or task_type == '':
             task_type = TaskTypeChoices.START_SYNC
-        print(f'23. Creating new sync job for {task_type}')
+        # print(f'23. Creating new sync job for {task_type}')
         sync_job = SyncTask(
             task_type=task_type,
             done=False,
@@ -192,18 +192,18 @@ def should_delay_job_run(
         task_type,
         domain=None
 ):
-    print('3. If possible only run one synchronization at the time')
+    # print('3. If possible only run one synchronization at the time')
     # If possible only run one synchronization at the time
     # get all running task that have type START_SYNC
     if domain is None:
-        print('4. get all running task that have type START_SYNC no Domain')
+        # print('4. get all running task that have type START_SYNC no Domain')
         running_job = SyncTask.objects.filter(
             task_type=task_type,
             done=False,
             status=TaskStatusChoices.STATUS_RUNNING
         )
     else:
-        print('4. get all running task that have type START_SYNC')
+        # print('4. get all running task that have type START_SYNC')
         running_job = SyncTask.objects.filter(
             task_type=task_type,
             done=False,
@@ -211,12 +211,12 @@ def should_delay_job_run(
             status=TaskStatusChoices.STATUS_RUNNING
         )
     # Count how many task are running
-    print('5. Count how many task are running')
+    # print('5. Count how many task are running')
     total_running_jobs = running_job.count()
-    print(f'6. Running task {total_running_jobs}')
+    # print(f'6. Running task {total_running_jobs}')
 
     # Get the task by its task_id if no task_id is set then it will be created later
-    print('7. Get the task by its task_id if no task_id is set then it will be created later')
+    # print('7. Get the task by its task_id if no task_id is set then it will be created later')
     for job in running_job:
         if sync_task is not None:
             if sync_task.id == job.id:
@@ -234,11 +234,11 @@ def should_delay_job_run(
 
 
 def get_process_vm(vm_info_task_id):
-    print('Executing process_vm_info2')
+    # print('Executing process_vm_info2')
     msg = f'[Start process_vm_info2:{vm_info_task_id}]'
     message = f'-> {datetime.now(pytz.timezone(TIME_ZONE)).strftime("%Y-%m-%d %H:%M:%S")} - {msg}'
     log.info(message)
-    print(message)
+    # print(message)
 
     try:
         vm_info_task = SyncTask.objects.get(id=vm_info_task_id)
@@ -249,7 +249,7 @@ def get_process_vm(vm_info_task_id):
 
 
 def get_cluster_from_domain(domain):
-    print('[OK] Getting cluster')
+    # print('[OK] Getting cluster')
     proxmox_session = get_session(domain)
     proxmox = proxmox_session.get('PROXMOX_SESSION')
     cluster = get_set_cluster(proxmox)
@@ -269,27 +269,27 @@ def nb_search_data_(proxmox_json, domain, cluster=None):
         return None
 
     # Search Netbox object by name gotten from Proxmox
-    print('[OK] Getting node')
+    # print('[OK] Getting node')
     node = proxmox_json['node']
     if cluster is None:
-        print('[OK] Getting cluster')
+        # print('[OK] Getting cluster')
         cluster = get_set_cluster(proxmox)
 
-    print('[OK] Getting vmid')
+    # print('[OK] Getting vmid')
     vmid = proxmox_json['vmid']
     return cluster, vmid, node, proxmox_vm_name, proxmox_session, proxmox
 
 
 def set_vm(vm_info_task, cluster=None):
-    print('[OK] STARTING PROCESS FOR VIRTUAL MACHINE')
+    # print('[OK] STARTING PROCESS FOR VIRTUAL MACHINE')
     proxmox_json = vm_info_task.data_instance
 
     cluster, vmid, node, proxmox_vm_name, proxmox_session, proxmox = nb_search_data_(proxmox_json, vm_info_task.domain,
                                                                                      cluster)
     netbox_vm = get_nb_by_(cluster.name, vmid, node, proxmox_vm_name)
 
-    print("GOT VM")
-    print(netbox_vm)
+    # print("GOT VM")
+    # print(netbox_vm)
     # vm_on_netbox = is_vm_on_netbox(netbox_vm)
     if netbox_vm == None:
         print('[OK] VM does not exist on Netbox -> {}'.format(proxmox_vm_name))
@@ -298,6 +298,6 @@ def set_vm(vm_info_task, cluster=None):
     # vm_info_task.virtual_machine = netbox_vm
     vm_info_task.virtual_machine_id = netbox_vm.id
     vm_info_task.save()
-    print("VM CREATED")
-    print(netbox_vm)
+    # print("VM CREATED")
+    # print(netbox_vm)
     return netbox_vm

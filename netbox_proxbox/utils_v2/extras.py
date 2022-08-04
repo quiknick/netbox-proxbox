@@ -22,27 +22,31 @@ def validate_custom_tag(name):
         it.group().lower().strip()
         has_string = True
     except Exception as e:
-        print("Error: validate_custom_tag - {}".format(e))
-        print(e)
+        pass
+        # print("Error: validate_custom_tag - {}".format(e))
+        # print(e)
     return has_string
 
 
-def custom_tag(tag_name, tag_slug, tag_description="No description"):
+def custom_tag(tag_name, tag_slug, tag_description="No description", color='ff5722'):
     # Check if Proxbox tag already exists.
-    proxbox_tag = Tag.objects.get(slug=tag_slug)
+    proxbox_tag = Tag.objects.filter(slug=tag_slug).first()
 
-    if proxbox_tag == None:
+    if proxbox_tag is None:
         try:
             # If Proxbox tag does not exist, create one.
             tag = Tag(
                 name=tag_name,
                 slug=tag_slug,
-                color='ff5722',
+                color=color,
                 description=tag_description
             )
-        except:
-            return "Error creating the '{0}' tag. Possible errors: the name '{0}' or slug '{1}' is already used.".format(
-                tag_name, tag_slug)
+            tag.save()
+        except Exception as e:
+            print(e)
+            print("Error creating the '{0}' tag. Possible errors: the name '{0}' or slug '{1}' is already used.".format(
+                tag_name, tag_slug))
+            return None
     else:
         tag = proxbox_tag
 
