@@ -38,12 +38,12 @@ def get_set_role(**kwargs):
 
     # If user configured ROLE_ID in Netbox's PLUGINS_CONFIG, use it.
     if role_id > 0:
-        role = None
-        try:
-            role = DeviceRole.objects.filter(id=role_id).first()
-        except Exception as e:
-            # print(e)
-            pass
+        # role = None
+        # try:
+        role = DeviceRole.objects.filter(id=role_id).first()
+        # except Exception as e:
+        #     print(e)
+            # pass
 
         if role == None:
             return "Role ID of Virtual Machine or Node invalid. Maybe the ID passed does not exist or it is not a integer!"

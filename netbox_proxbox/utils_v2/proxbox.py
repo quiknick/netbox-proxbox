@@ -21,7 +21,7 @@ def get_resources(proxmox_vm):
 
 
 def set_get_proxbox_item(vm_info_task, cluster=None):
-    print('[OK] STARTING PROCESS FOR PROXBOX')
+    # print('[OK] STARTING PROCESS FOR PROXBOX')
     proxmox_json = vm_info_task.data_instance
     domain = vm_info_task.domain
     cluster, vmid, node, proxmox_vm_name, proxmox_session, proxmox = nb_search_data_(proxmox_json, vm_info_task.domain,

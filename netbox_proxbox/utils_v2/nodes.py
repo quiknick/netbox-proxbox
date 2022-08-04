@@ -71,8 +71,8 @@ def create_node(proxmox, proxmox_node, proxmox_session=None):
         netbox_obj.cluster_id = cluster.id
         netbox_obj.save()
     except Exception as e:
-        print(e)
         print("[proxbox_api.create.node] Creation of NODE failed.")
+        print(e)
         # In case nothing works, returns error
         return None
     else:
@@ -169,9 +169,10 @@ def get_set_interface(name, netbox_node):
         # new_interface_json = {"device_id": netbox_node.id, "name": name, type: InterfaceTypeChoices.TYPE_LAG}
         dev_interface = Interface(
             name=name,
-            form_factor=0,
+            # form_factor=0,
             description="LAG",
-            device=netbox_node.id,
+            device=netbox_node,
+            device_id=netbox_node.id,
             type=InterfaceTypeChoices.TYPE_LAG
         )
         dev_interface.save()
@@ -208,11 +209,15 @@ def interface_ip_assign(netbox_node, proxmox_json):
                 # print('')
                 print(e)
         # Associate the ip address to the vm
+        # Reload the ip in order to get the correct family version
+        netbox_ip = IPAddress.objects.filter(address=ip).first()
         netbox_node.primary_ip_id = netbox_ip.id
         if netbox_ip.family == 4:
             netbox_node.primary_ip4 = netbox_ip
+            netbox_node.primary_ip4_id = netbox_ip.id
         else:
             netbox_node.primary_ip6 = netbox_ip
+            netbox_node.primary_ip6_id = netbox_ip.id
         netbox_node.save()
         return True
     except Exception as e:

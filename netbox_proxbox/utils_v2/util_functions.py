@@ -65,7 +65,7 @@ def delay_sync(
     msg = f'[OK] Delaying the run by {plus_time} minutes'
     message = f'-> {datetime.now(pytz.timezone(TIME_ZONE)).strftime("%Y-%m-%d %H:%M:%S")} - {msg}'
     log.info(message)
-    print(message)
+    # print(message)
     now = datetime.now()
 
     # next execution
@@ -112,7 +112,7 @@ def queue_next_sync(
         msg = msg + next_queue_function_string
     message = f'-> {datetime.now(pytz.timezone(TIME_ZONE)).strftime("%Y-%m-%d %H:%M:%S")} - {msg}'
     log.info(message)
-    print(message)
+    # print(message)
     try:
         if sync_task is not None:
             sync_task.status = status
@@ -234,11 +234,11 @@ def should_delay_job_run(
 
 
 def get_process_vm(vm_info_task_id):
-    print('Executing process_vm_info2')
+    # print('Executing process_vm_info2')
     msg = f'[Start process_vm_info2:{vm_info_task_id}]'
     message = f'-> {datetime.now(pytz.timezone(TIME_ZONE)).strftime("%Y-%m-%d %H:%M:%S")} - {msg}'
     log.info(message)
-    print(message)
+    # print(message)
 
     try:
         vm_info_task = SyncTask.objects.get(id=vm_info_task_id)
@@ -249,7 +249,7 @@ def get_process_vm(vm_info_task_id):
 
 
 def get_cluster_from_domain(domain):
-    print('[OK] Getting cluster')
+    # print('[OK] Getting cluster')
     proxmox_session = get_session(domain)
     proxmox = proxmox_session.get('PROXMOX_SESSION')
     cluster = get_set_cluster(proxmox)
@@ -269,27 +269,27 @@ def nb_search_data_(proxmox_json, domain, cluster=None):
         return None
 
     # Search Netbox object by name gotten from Proxmox
-    print('[OK] Getting node')
+    # print('[OK] Getting node')
     node = proxmox_json['node']
     if cluster is None:
-        print('[OK] Getting cluster')
+        # print('[OK] Getting cluster')
         cluster = get_set_cluster(proxmox)
 
-    print('[OK] Getting vmid')
+    # print('[OK] Getting vmid')
     vmid = proxmox_json['vmid']
     return cluster, vmid, node, proxmox_vm_name, proxmox_session, proxmox
 
 
 def set_vm(vm_info_task, cluster=None):
-    print('[OK] STARTING PROCESS FOR VIRTUAL MACHINE')
+    # print('[OK] STARTING PROCESS FOR VIRTUAL MACHINE')
     proxmox_json = vm_info_task.data_instance
 
     cluster, vmid, node, proxmox_vm_name, proxmox_session, proxmox = nb_search_data_(proxmox_json, vm_info_task.domain,
                                                                                      cluster)
     netbox_vm = get_nb_by_(cluster.name, vmid, node, proxmox_vm_name)
 
-    print("GOT VM")
-    print(netbox_vm)
+    # print("GOT VM")
+    # print(netbox_vm)
     # vm_on_netbox = is_vm_on_netbox(netbox_vm)
     if netbox_vm == None:
         print('[OK] VM does not exist on Netbox -> {}'.format(proxmox_vm_name))
@@ -298,6 +298,6 @@ def set_vm(vm_info_task, cluster=None):
     # vm_info_task.virtual_machine = netbox_vm
     vm_info_task.virtual_machine_id = netbox_vm.id
     vm_info_task.save()
-    print("VM CREATED")
-    print(netbox_vm)
+    # print("VM CREATED")
+    # print(netbox_vm)
     return netbox_vm

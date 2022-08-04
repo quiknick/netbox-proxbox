@@ -798,8 +798,9 @@ def default_tenant(netbox_vm):
         it.group().lower().strip()
         has_string = True
     except Exception as e:
-        print("Error: default_tenant-1 - {}".format(e))
-        print(e)
+        pass
+        # print("Error: default_tenant-1 - {}".format(e))
+        # print(e)
     if has_string:
         if NETBOX_TENANT_NAME is not None:
             nb_tenant = nb.tenancy.tenants.get(name=NETBOX_TENANT_NAME)
