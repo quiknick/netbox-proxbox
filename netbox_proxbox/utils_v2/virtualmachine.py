@@ -824,6 +824,8 @@ def get_set_vm(cluster, proxmox_vm):
     if netbox_vm is None:
         try:
             netbox_vm = VirtualMachine(name=vm_name)
+            netbox_vm.cluster_id = cluster.id
+            netbox_vm.cluster = cluster
             netbox_vm.save()
             print("VIRTUAL MACHINE CREATED")
             print(netbox_vm)
