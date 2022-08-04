@@ -29,25 +29,25 @@ def vm_full_update(proxmox_session, netbox_vm, proxmox_vm):
     changes = {}
 
     # Update 'status' field, if necessary.
-    print("===>Update 'status' field, if necessary.")
+    print("[OK] Update 'status' field, if necessary.")
     status_updated = updates.virtual_machine.status(netbox_vm, proxmox_vm)
 
     # Update 'custom_fields' field, if necessary.
-    print("===>Update 'custom_fields' field, if necessary.")
+    print("[OK] Update 'custom_fields' field, if necessary.")
     custom_fields_updated = updates.virtual_machine.custom_fields(netbox_vm, proxmox_vm)
 
     # Update 'local_context_data' json, if necessary.
-    print("===>Update 'local_context_data' json, if necessary.")
+    print("[OK] Update 'local_context_data' json, if necessary.")
     local_context_updated = updates.virtual_machine.local_context_data(netbox_vm, proxmox_vm, PROXMOX, PROXMOX_PORT)
 
     # Update 'resources', like CPU, Memory and Disk, if necessary.
-    print("===>Update 'resources', like CPU, Memory and Disk, if necessary.")
+    print("[OK] Update 'resources', like CPU, Memory and Disk, if necessary.")
     resources_updated = updates.virtual_machine.resources(netbox_vm, proxmox_vm)
 
-    print("===>Update tags")
+    print("[OK] Update tags")
     tag_updated = updates.extras.tag(netbox_vm)
     #
-    print("===>Update ips")
+    print("[OK] Update ips")
     ip_update = updates.virtual_machine.add_configuration(proxmox, netbox_vm, proxmox_vm)
     # changes = [custom_fields_updated, status_updated, local_context_updated, resources_updated]
     changes = {
@@ -175,7 +175,7 @@ def virtual_machine(**kwargs):
     if proxmox_id != None:
         proxmox_id_type = type(proxmox_id)
         if 'int' not in str(proxmox_id_type):
-            print('[ERROR] "proxmox_id" MUST be integer. Type used: {}'.format(proxmox_id_type))
+            # print('[ERROR] "proxmox_id" MUST be integer. Type used: {}'.format(proxmox_id_type))
             # return False
             json_vm["result"] = False
 
@@ -186,7 +186,7 @@ def virtual_machine(**kwargs):
     if id != None:
         id_type = type(id)
         if 'int' not in str(id_type):
-            print('[ERROR] "id" MUST be integer. Type used: {}'.format(id_type))
+            # print('[ERROR] "id" MUST be integer. Type used: {}'.format(id_type))
             # return False
             json_vm["result"] = False
 
@@ -197,7 +197,7 @@ def virtual_machine(**kwargs):
     if name != None:
         name_type = type(name)
         if 'str' not in str(name_type):
-            print('[ERROR] "name" MUST be string. Type used: {}'.format(name_type))
+            # print('[ERROR] "name" MUST be string. Type used: {}'.format(name_type))
             # return False
             json_vm["result"] = False
 
@@ -236,7 +236,7 @@ def virtual_machine(**kwargs):
 
                 # Analyze search result and returns error, if null value.
                 if proxmox_json == None:
-                    print("[ERROR] Error to get Proxmox Virtual Machine using 'proxmox_id'")
+                    # print("[ERROR] Error to get Proxmox Virtual Machine using 'proxmox_id'")
                     json_vm["result"] = False
 
                 proxmox_vm_name = proxmox_json['name']
@@ -248,7 +248,7 @@ def virtual_machine(**kwargs):
 
                 # Analyze search result and returns error, if null value.
                 if proxmox_json == None:
-                    print("[ERROR] Error to get Proxmox Virtual Machine using 'proxmox_name'")
+                    # print("[ERROR] Error to get Proxmox Virtual Machine using 'proxmox_name'")
                     json_vm["result"] = False
 
                 proxmox_vm_name = proxmox_json['name']
@@ -261,7 +261,7 @@ def virtual_machine(**kwargs):
 
                 # Analyze search result and returns error, if null value.
                 if proxmox_json == None:
-                    print("[ERROR] Error to get Proxmox Virtual Machine using 'proxmox_id'")
+                    # print("[ERROR] Error to get Proxmox Virtual Machine using 'proxmox_id'")
                     json_vm["result"] = False
 
                 proxmox_vm_name = proxmox_json['name']
@@ -274,7 +274,7 @@ def virtual_machine(**kwargs):
 
                     # Analyze search result and returns error, if null value.
                     if proxmox_json == None:
-                        print("[ERROR] Error to get Proxmox Virtual Machine using 'proxmox_name'")
+                        # print("[ERROR] Error to get Proxmox Virtual Machine using 'proxmox_name'")
                         json_vm["result"] = False
 
                     proxmox_vm_name = proxmox_json['name']

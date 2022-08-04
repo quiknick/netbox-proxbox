@@ -22,8 +22,9 @@ def validate_custom_tag(name):
         it.group().lower().strip()
         has_string = True
     except Exception as e:
-        print("Error: validate_custom_tag - {}".format(e))
-        print(e)
+        pass
+        # print("Error: validate_custom_tag - {}".format(e))
+        # print(e)
     return has_string
 
 

@@ -255,7 +255,7 @@ def get_ip(test_str):
         print('[OK] Parse. -> {}'.format(ip))
         return ip
     except Exception as e:
-        print("Error: get_ip - {}".format(e))
+        # print("Error: get_ip - {}".format(e))
         return None
 
 
@@ -272,7 +272,7 @@ def get_ipv6(test_str):
         print('[OK] Parse. -> {}'.format(ip))
         return ip
     except Exception as e:
-        print("Error: get_ipv6 - {}".format(e))
+        # print("Error: get_ipv6 - {}".format(e))
         return None
 
 
@@ -362,7 +362,7 @@ def get_main_ip(test_str):
             .strip()
         ipv4 = (re.sub(rgx, '', ipv4)).strip()
     except Exception as e:
-        print("Error: get_main_ip-ip4 - {}".format(e))
+        # print("Error: get_main_ip-ip4 - {}".format(e))
         pass
     try:
         print('[OK] Parsing main ip for ipv6')
@@ -377,7 +377,7 @@ def get_main_ip(test_str):
             .strip()
         ipv6 = (re.sub(rgx, '', ipv6)).strip()
     except Exception as e:
-        print("Error: get_main_ip-ip6 - {}".format(e))
+        # print("Error: get_main_ip-ip6 - {}".format(e))
         pass
     try:
         if ipv4 is None:
@@ -395,7 +395,7 @@ def get_main_ip(test_str):
                 .strip()
             ipv4 = (re.sub(rgx, '', ipv4)).strip()
     except Exception as e:
-        print("Error: get_main_ip-ip4-location - {}".format(e))
+        # print("Error: get_main_ip-ip4-location - {}".format(e))
         pass
     try:
         if ipv6 is None:
@@ -413,7 +413,7 @@ def get_main_ip(test_str):
                 .strip()
             ipv6 = (re.sub(rgx, '', ipv6)).strip()
     except Exception as e:
-        print("Error: get_main_ip-ip6-allocation - {}".format(e))
+        # print("Error: get_main_ip-ip6-allocation - {}".format(e))
         pass
     return ipv4, ipv6
 
@@ -530,8 +530,8 @@ def client_tenant_parser(test_str):
         try:
             m_result = re.finditer(sub_str_regex, client, re.MULTILINE | re.IGNORECASE).__next__().group().strip()
         except Exception as e:
-            print("Error: client_tenant_parser - {}".format(e))
-            print(e)
+            # print("Error: client_tenant_parser - {}".format(e))
+            # print(e)
             pass
         if m_result:
             if m_result.replace('(', '').replace(')', '').strip():
@@ -541,7 +541,7 @@ def client_tenant_parser(test_str):
             tenant_name = client
         print('[OK] Tenant parse. -> {}'.format(client))
     except Exception as e:
-        print("Error: client_tenant_parser-all - {}".format(e))
+        # print("Error: client_tenant_parser-all - {}".format(e))
         pass
     return tenant_name, client
 
@@ -564,8 +564,9 @@ def contact_parse_set(test_str, name):
                 .strip()
             print('[OK] Contact email parsed. -> {}'.format(contact_email))
         except Exception as e:
-            print("Error: contact_parse_set - {}".format(e))
-            print(e)
+            # print("Error: contact_parse_set - {}".format(e))
+            # print(e)
+            pass
         if contact_email is None:
             return None, None
 

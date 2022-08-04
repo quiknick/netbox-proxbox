@@ -690,13 +690,13 @@ def get_vms_for_the_node(node_task_id, task_id, iteration=0):
     print('\n\n\nVIRTUAL MACHINES...')
     virtualmachines_list = []
     should_delay = should_delay_job_run(vm_task, TaskTypeChoices.GET_VMS_FROM_NODES, domain)
-    print(f'37. Should delay the job {should_delay}')
+    # print(f'37. Should delay the job {should_delay}')
     if should_delay:
         current_queue_args = [
             node_task_id, task_id, 0
         ]
         # Run the delay process if there is already other process with the same characterics is running
-        print('38. Run the delay process if there is already other process with the same characterics is running')
+        # print('38. Run the delay process if there is already other process with the same characterics is running')
         cluster_nodes = delay_sync(vm_task, start_cluster_sync, current_queue_args, 1)
         return f'Delaying :{cluster_nodes.name}:{cluster_nodes.id}'
     else:
@@ -730,8 +730,8 @@ def get_vms_for_the_node(node_task_id, task_id, iteration=0):
                     vm_task.id, px_vm_each, cluster, None
                 ]
 
-                print(f'34. Run the next function (process_vm_info for {domain}) ')
-                print(process_vm_info_args)
+                # print(f'34. Run the next function (process_vm_info for {domain}) ')
+                # print(process_vm_info_args)
                 counter = counter + 1
                 queue_next_sync(vm_task, process_vm_info, process_vm_info_args, 'process_vm_info')
 
@@ -770,12 +770,12 @@ def get_nodes_for_the_cluster(cluster_data_id, task_id, iteration=0):
         remove_unused = cluster_data.remove_unused
         domain = cluster_data.domain
 
-        print('29. Getting or creating the node data sync job')
+        # print('29. Getting or creating the node data sync job')
         cluster_nodes = get_or_create_sync_job(task_id, user, remove_unused, TaskTypeChoices.START_NODE_SYNC)
 
         if task_id is None or task_id == '':
             task_id = cluster_data.id
-        print('30. Updating info for the cluster data')
+        # print('30. Updating info for the cluster data')
         cluster_nodes.parent = cluster_data
         cluster_nodes.parent_id = cluster_data.id
         cluster_nodes.name = 'Start cluster nodes'
@@ -797,13 +797,13 @@ def get_nodes_for_the_cluster(cluster_data_id, task_id, iteration=0):
 
         print('Finish get_cluster_data')
         should_delay = should_delay_job_run(cluster_nodes, TaskTypeChoices.START_NODE_SYNC, domain)
-        print(f'31. Should delay the job {should_delay}')
+        # print(f'31. Should delay the job {should_delay}')
         if should_delay:
             current_queue_args = [
                 cluster_data_id, task_id, 0
             ]
             # Run the delay process if there is already other process with the same characterics is running
-            print('32. Run the delay process if there is already other process with the same characterics is running')
+            # print('32. Run the delay process if there is already other process with the same characterics is running')
             cluster_nodes = delay_sync(cluster_nodes, start_cluster_sync, current_queue_args, 1)
             return f'Delaying :{cluster_nodes.name}:{cluster_nodes.id}'
         else:
@@ -814,7 +814,7 @@ def get_nodes_for_the_cluster(cluster_data_id, task_id, iteration=0):
                 proxmox_session = get_session(domain)
                 proxmox = proxmox_session.get('PROXMOX_SESSION')
             except Exception as e:
-                print("Error: update_vm_process-get_nodes_for_the_cluster-proxmox_session - {}".format(e))
+                print("[ERROR] update_vm_process-get_nodes_for_the_cluster-proxmox_session - {}".format(e))
                 print(e)
 
             for px_node_each in proxmox_nodes:
@@ -837,12 +837,12 @@ def get_nodes_for_the_cluster(cluster_data_id, task_id, iteration=0):
 
             cluster_nodes.data_instance = node_response_list
             cluster_nodes.save()
-            print(f'33. Finish get_nodes_for_the_cluster')
+            # print(f'33. Finish get_nodes_for_the_cluster')
 
             get_nodes_for_the_cluster_args = [
                 cluster_nodes_id, None, 0
             ]
-            print(f'34. Run the next function (get_nodes_for_the_cluster for {domain}) ')
+            # print(f'34. Run the next function (get_nodes_for_the_cluster for {domain}) ')
             queue_next_sync(cluster_nodes, get_vms_for_the_node, get_nodes_for_the_cluster_args,
                             'get_vms_for_the_node')
     except Exception as e:
@@ -893,13 +893,13 @@ def get_cluster_data(cluster_task_id, domain, task_id, iteration=0):
         user = cluster_sync.user
         remove_unused = cluster_sync.remove_unused
 
-        print('22. Getting or creating the cluster data sync job')
+        # print('22. Getting or creating the cluster data sync job')
         cluster_data = get_or_create_sync_job(task_id, user, remove_unused, TaskTypeChoices.GET_CLUSTER_DATA)
 
         if task_id is None or task_id == '':
             task_id = cluster_data.id
 
-        print('24. Updating info for the cluster data')
+        # print('24. Updating info for the cluster data')
         cluster_data.parent = cluster_sync
         cluster_data.parent_id = cluster_sync.id
         cluster_data.name = 'Start cluster data'
@@ -907,7 +907,7 @@ def get_cluster_data(cluster_task_id, domain, task_id, iteration=0):
         cluster_data.status = TaskStatusChoices.STATUS_RUNNING
         cluster_data.job_id = cluster_sync.job_id
         cluster_data.save()
-        print('25. Getting proxmox session')
+        # print('25. Getting proxmox session')
         proxmox_session = get_session(domain)
         proxmox = proxmox_session.get('PROXMOX_SESSION')
         cluster_all = proxmox.cluster.status.get()
@@ -924,13 +924,13 @@ def get_cluster_data(cluster_task_id, domain, task_id, iteration=0):
         print(proxmox_cluster)
         print('[OK] Finish get_cluster_data')
         should_delay = should_delay_job_run(cluster_data, TaskTypeChoices.GET_CLUSTER_DATA, domain)
-        print(f'26. Should delay the job {should_delay}')
+        # print(f'26. Should delay the job {should_delay}')
         if should_delay:
             current_queue_args = [
                 cluster_task_id, domain, task_id, 0
             ]
             # Run the delay process if there is already other process with the same characterics is running
-            print('27. Run the delay process if there is already other process with the same characterics is running')
+            # print('27. Run the delay process if there is already other process with the same characterics is running')
             cluster_data = delay_sync(cluster_data, start_cluster_sync, current_queue_args, 1)
             return f'Delaying :{cluster_data.name}:{cluster_data.id}'
         else:
@@ -940,7 +940,7 @@ def get_cluster_data(cluster_task_id, domain, task_id, iteration=0):
             get_nodes_for_the_cluster_args = [
                 cluster_data_id, None, 0
             ]
-            print(f'28. Run the next function (get_nodes_for_the_cluster for {domain}) ')
+            # print(f'28. Run the next function (get_nodes_for_the_cluster for {domain}) ')
             queue_next_sync(cluster_data, get_nodes_for_the_cluster, get_nodes_for_the_cluster_args,
                             'get_nodes_for_the_cluster')
 
@@ -990,7 +990,7 @@ def start_cluster_sync(sync_job_id, task_id, iteration=0):
         try:
             sync_job = SyncTask.objects.get(id=sync_job_id)
         except Exception as e:
-            print("Error: start_cluster_sync-sync_job {}".format(e))
+            print("[ERROR] start_cluster_sync-sync_job {}".format(e))
             print('SYNC JOB NOT FOUND DELAYING IN ORDER TO WAIT FOR THE DATA BASE COMMIT')
             print(e)
             iteration = iteration + 1
@@ -1006,7 +1006,7 @@ def start_cluster_sync(sync_job_id, task_id, iteration=0):
         cluster_sync = get_or_create_sync_job(task_id, user, remove_unused, TaskTypeChoices.START_CLUSTER_SYNC)
         if task_id is None or task_id == '':
             task_id = cluster_sync.id
-        print('18. Set parent for the cluster job')
+        # print('18. Set parent for the cluster job')
         cluster_sync.parent = sync_job
         cluster_sync.parent_id = sync_job.id
         cluster_sync.name = 'Start cluster sync'
@@ -1014,7 +1014,7 @@ def start_cluster_sync(sync_job_id, task_id, iteration=0):
         cluster_sync.save()
 
         should_delay = should_delay_job_run(cluster_sync, TaskTypeChoices.START_CLUSTER_SYNC, None)
-        print(f'19. Should delay the job {should_delay}')
+        # print(f'19. Should delay the job {should_delay}')
         if should_delay:
             current_queue_args = [
                 sync_job_id,
@@ -1022,7 +1022,7 @@ def start_cluster_sync(sync_job_id, task_id, iteration=0):
                 0
             ]
             # Run the delay process if there is already other process with the same characterics is running
-            print('20. Run the delay process if there is already other process with the same characterics is running')
+            # print('20. Run the delay process if there is already other process with the same characterics is running')
             cluster_sync = delay_sync(cluster_sync, start_cluster_sync, current_queue_args, 1)
             return f'Delaying :{cluster_sync.name}:{cluster_sync.id}'
         else:
@@ -1038,7 +1038,7 @@ def start_cluster_sync(sync_job_id, task_id, iteration=0):
                         None,
                         0
                     ]
-                    print(f'21. Run the next function (get_cluster_data for {domain}) ')
+                    # print(f'21. Run the next function (get_cluster_data for {domain}) ')
                     queue_next_sync(cluster_sync, get_cluster_data, get_cluster_data_args, 'get_cluster_data')
                 except Exception as e:
                     print("Error: start_cluster_sync-proxmox_sessions {}".format(e))
@@ -1054,7 +1054,7 @@ def start_cluster_sync(sync_job_id, task_id, iteration=0):
 
 def job_start_sync(task_id, user, remove_unused):
     print('\n\n***>Executing job_start_sync<***')
-    print('1. Start job_start_sync function')
+    # print('1. Start job_start_sync function')
     sync_task = get_or_create_sync_job(task_id, user, remove_unused)
     if sync_task.job_id is None:
         sync_task.job_id = uuid.uuid4()
@@ -1063,7 +1063,7 @@ def job_start_sync(task_id, user, remove_unused):
         task_id = sync_task.id
 
     should_delay = should_delay_job_run(sync_task, TaskTypeChoices.START_SYNC, None)
-    print(f'8. Should delay the job {should_delay}')
+    # print(f'8. Should delay the job {should_delay}')
     if should_delay:
         current_running = SyncTask.objects.filter(
             task_type=TaskTypeChoices.START_SYNC,
@@ -1111,7 +1111,7 @@ def job_start_sync(task_id, user, remove_unused):
             remove_unused
         ]
         # Run the delay process if there is already other process with the same characterics is running
-        print('9. Run the delay process if there is already other process with the same characterics is running')
+        # print('9. Run the delay process if there is already other process with the same characterics is running')
         sync_task = delay_sync(sync_task, start_sync, current_queue_args, 1)
     else:
         next_queue_args = [
@@ -1120,7 +1120,7 @@ def job_start_sync(task_id, user, remove_unused):
             0
         ]
         # Run the next function (start_cluster_sync)
-        print('14. Run the next function (start_cluster_sync) ')
+        # print('14. Run the next function (start_cluster_sync) ')
         sync_task.start_time = (datetime.now()).replace(microsecond=0, tzinfo=pytz.utc)
         sync_task.save()
         sync_task = queue_next_sync(sync_task, start_cluster_sync, next_queue_args, 'start_cluster_sync')

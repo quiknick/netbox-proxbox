@@ -57,12 +57,12 @@ def delay_sync(
         schedule_args,
         plus_time=5
 ):
-    print('10. Delaying the current execution')
+    # print('10. Delaying the current execution')
     if sync_task is None:
         raise Exception("Object sync_task can't be None")
 
     status = TaskStatusChoices.STATUS_SCHEDULED
-    msg = f'Delaying the run by {plus_time} minutes'
+    msg = f'[OK] Delaying the run by {plus_time} minutes'
     message = f'-> {datetime.now(pytz.timezone(TIME_ZONE)).strftime("%Y-%m-%d %H:%M:%S")} - {msg}'
     log.info(message)
     print(message)
@@ -73,7 +73,7 @@ def delay_sync(
     sync_task.status = status
     sync_task.message = message
     sync_task.scheduled_time = now_plus_time
-    print('11. Save the task')
+    # print('11. Save the task')
     sync_task.save()
 
     # Schedule the execution
@@ -86,7 +86,7 @@ def delay_sync(
     # )
     # sync_task.job_id = schedule_job.id
     # sync_task.save()
-    print(f'13. Next task successfully queue with id: {schedule_job.id}')
+    # print(f'13. Next task successfully queue with id: {schedule_job.id}')
 
     return sync_task
 

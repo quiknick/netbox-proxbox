@@ -42,7 +42,7 @@ def get_set_role(**kwargs):
         try:
             role = DeviceRole.objects.filter(id=role_id).first()
         except Exception as e:
-            print(e)
+            # print(e)
             pass
 
         if role == None:

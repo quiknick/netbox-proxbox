@@ -205,7 +205,7 @@ def interface_ip_assign(netbox_node, proxmox_json):
                 netbox_ip.save()
             except Exception as e:
                 print("Error: interface_ip_assign-update - {}".format(e))
-                print('')
+                # print('')
                 print(e)
         # Associate the ip address to the vm
         netbox_node.primary_ip_id = netbox_ip.id
