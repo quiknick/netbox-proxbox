@@ -186,19 +186,19 @@ def interface_ip_assign(netbox_node, proxmox_json):
         node_interface = get_set_interface('Bond0', netbox_node)
         # netbox_ip = nb.ipam.ip_addresses.get(address=ip)
         netbox_ip = IPAddress.objects.filter(address=ip).first()
-
+        content_type = ContentType.objects.filter(app_label="dcim", model="interface").first()
         if netbox_ip is None:
             # Create the ip address and link it to the interface previously created
-            address = {
-                "address": ip,
-                "assigned_object_type": "dcim.interface",
-                "assigned_object_id": node_interface.id
-            }
-            netbox_ip = IPAddress(address)
+            netbox_ip = IPAddress(
+                address=ip
+            )
+            netbox_ip.assigned_object_type = content_type  # "dcim.interface"
+            netbox_ip.assigned_object_id = node_interface.id
+            netbox_ip.assigned_object = node_interface
             netbox_ip.save()
         else:
             try:
-                content_type = ContentType.objects.filter(app_label="dcim", model="interface").first()
+
                 netbox_ip.assigned_object_type = content_type  # "dcim.interface"
                 netbox_ip.assigned_object_id = node_interface.id
                 netbox_ip.assigned_object = node_interface
