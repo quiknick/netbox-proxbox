@@ -45,32 +45,41 @@ def create_node(proxmox, proxmox_node, proxmox_session=None):
         role_name = proxmox_session.get('NETBOX_NODE_ROLE_NAME', role_name)
 
     # Create json with basic NODE information
-
-    node_json = {}
-    node_json["name"] = proxmox_node['name']
-    node_json["device_role"] = get_set_role(role_id=role_id, role_name=role_name).id
-    node_json["device_type"] = get_set_device_type().id
-    node_json["site"] = get_set_site(site_id=site_id, site_name=site_name).id
-    node_json["status"] = 'active'
-    node_json["tags"] = [tag().id]
-    node_json["cluster"] = get_set_cluster(proxmox).id
-
     # Create Node with json 'node_json'
     try:
-        netbox_obj = Device(node_json)
+        node_json = {}
+        name = proxmox_node['name']
+        device_role = get_set_role(role_id=role_id, role_name=role_name)
+        device_type = get_set_device_type()
+        site = get_set_site(site_id=site_id, site_name=site_name)
+        cluster = get_set_cluster(proxmox)
 
+        netbox_obj = Device(
+            name=name
+        )
+
+        netbox_obj.device_role = device_role
+        netbox_obj.device_role_id = device_role.id
+
+        netbox_obj.device_type = device_type
+        netbox_obj.device_type_id = device_type.id
+
+        netbox_obj.site = site
+        netbox_obj.site_id = site.id
+        netbox_obj.status = 'active'
+        netbox_obj.cluster = cluster
+        netbox_obj.cluster_id = cluster.id
+        netbox_obj.save()
     except Exception as e:
         print(e)
         print("[proxbox_api.create.node] Creation of NODE failed.")
-        netbox_obj = None
-
+        # In case nothing works, returns error
+        return None
     else:
+        if netbox_obj:
+            c_tag = tag()
+            netbox_obj.tags.add(c_tag)
         return netbox_obj
-
-    # In case nothing works, returns error
-    netbox_obj = None
-    return netbox_obj
-
 
 def status(netbox_node, proxmox_node):
     #

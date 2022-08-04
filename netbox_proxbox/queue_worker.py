@@ -3,7 +3,7 @@ import os
 import math
 
 from .others.db import namedtuplefetchall
-from .utils_v2.proxbox import set_get_proxbox_item
+from .utils_v2.proxbox import set_get_proxbox_item, set_get_proxbox_item_basic, set_get_proxbox_from_vm
 
 try:
     from django_rq import job
@@ -172,33 +172,41 @@ def get_promox_config(vm):
     proxbox_vm = None
     domain = None
     node = None
+    vmid = None
+    type = None
     try:
         proxbox_vm = ProxmoxVM.objects.filter(virtual_machine_id=vm.id).first()
         if proxbox_vm:
             # If there is an item get the configuration from proxmox
             domain = proxbox_vm.domain
             node = proxbox_vm.node
+            vmid = proxbox_vm.proxmox_vm_id
+            type = proxbox_vm.type
 
         # Get the domain from the context data of the vm if no proxbox item exist
         if domain is None:
             domain = vm.local_context_data['proxmox'].get('domain')
         if node is None:
-            node = domain = vm.local_context_data['proxmox'].get('node')
+            node = vm.local_context_data['proxmox'].get('node')
+        if vmid is None:
+            vmid = vm.local_context_data['proxmox'].get('id')
+        if type is None:
+            type = vm.local_context_data['proxmox'].get('type')
 
         if domain is not None:
             proxmox_session = get_session(domain)
             proxmox = proxmox_session.get('PROXMOX_SESSION')
-        vmid = proxbox_vm.vmid
-        if proxmox is not None and node is not None:
-            if proxbox_vm.type == 'qemu':
+
+        if proxmox is not None and node is not None and vmid is not None:
+            if type == 'qemu':
                 config = proxmox.nodes(node).qemu(vmid).config.get()
-            if proxbox_vm.type == 'lxc':
+            if type == 'lxc':
                 config = proxmox.nodes(node).lxc(vmid).config.get()
     except Exception as e:
         print("Error: get_promox_config-1 - {}".format(e))
         print(e)
         config = None
-    return config, proxbox_vm, domain, node
+    return config, proxbox_vm, domain, node, vmid, type
 
 
 def get_tags_name(vm):
@@ -258,11 +266,17 @@ def delete_vm(vm_id, remove_task_id):
 
         if vm:
             # Get the configuration from the proxbox table
-            config, proxbox_vm, domain, node = get_promox_config(vm)
+            config, proxbox_vm, domain, node, vmid, type = get_promox_config(vm)
             tags_name, tg = get_tags_name(vm)
             if tg.name in tags_name:
-                if proxbox_vm is None or config is None:
+                if config is None:
                     full_vm_delete(vm, proxbox_vm)
+                elif proxbox_vm is None:
+                    proxmox_session = get_session(domain)
+                    proxmox = proxmox_session.get('PROXMOX_SESSION')
+                    cluster = get_set_cluster(proxmox)
+                    proxbox_vm = set_get_proxbox_from_vm(vm, domain, node, vmid, remove_task.job_id, cluster, type,
+                                                         config)
     except Exception as e:
         print(f'[ERROR] Deleting vm')
         print(e)
@@ -310,6 +324,7 @@ def start_removing_vms(sync_task_process_id):
     queue_task.save()
 
     # Mark all the children job task as done, just in case there were not mark
+
     update_finish_sql(queue_task.job_id, queue_task.id)
 
     # Get all the vm's to be deleted
@@ -486,7 +501,32 @@ def update_vm_process(vm_info_task_id, cluster=None, proxbox_vm=None, step='fini
             resources_updated, netbox_vm = base_resources(netbox_vm, proxmox_json)
             print(resources_updated)
             netbox_vm.save()
-
+            next_step = 'add_config'
+        elif step == 'add_config':
+            print("===>Update configuration")
+            try:
+                add_config, netbox_vm = base_add_configuration(proxmox, netbox_vm, proxmox_json)
+                netbox_vm.save()
+                print(add_config)
+            except Exception as e:
+                print("Error: update_vm_process-add_config - {}".format(e))
+                print(e)
+                vm_info_task.message = "{}==>{}".format(step, e)
+                vm_info_task.fail_reason = "{}==>{}".format(step, e)
+                vm_info_task.save()
+            next_step = 'type_role'
+        elif step == 'type_role':
+            print("===>Update 'type_role' field, if necessary.")
+            try:
+                status_updated, netbox_vm = update_vm_role(netbox_vm, proxmox_json)
+                netbox_vm.save()
+                print(status_updated)
+            except Exception as e:
+                print("Error: update_vm_process-type_role - {}".format(e))
+                print(e)
+                vm_info_task.message = "{}==>{}".format(step, e)
+                vm_info_task.fail_reason = "{}==>{}".format(step, e)
+                vm_info_task.save()
             next_step = 'add_ip'
         elif step == 'add_ip':
             print("===>Update ips")
@@ -497,31 +537,9 @@ def update_vm_process(vm_info_task_id, cluster=None, proxbox_vm=None, step='fini
                 print("Error: update_vm_process-add_ip - {}".format(e))
                 print(e)
                 vm_info_task.message = "{}==>{}".format(step, e)
-                vm_info_task.save()
-            next_step = 'add_config'
-        elif step == 'add_config':
-            print("===>Update configuration")
-            try:
-                ip_update, netbox_vm = base_add_configuration(proxmox, netbox_vm, proxmox_json)
-                print(ip_update)
-            except Exception as e:
-                print("Error: update_vm_process-add_config - {}".format(e))
-                print(e)
-                vm_info_task.message = "{}==>{}".format(step, e)
-                vm_info_task.save()
-            next_step = 'type_role'
-        elif step == 'type_role':
-            print("===>Update 'type_role' field, if necessary.")
-            try:
-                status_updated, netbox_vm = update_vm_role(netbox_vm, proxmox_json)
-                print(status_updated)
-            except Exception as e:
-                print("Error: update_vm_process-type_role - {}".format(e))
-                print(e)
-                vm_info_task.message = "{}==>{}".format(step, e)
+                vm_info_task.fail_reason = "{}==>{}".format(step, e)
                 vm_info_task.save()
             next_step = 'finish'
-
         proxbox_vm.virtual_machine_id = netbox_vm.id
         proxbox_vm.virtual_machine = netbox_vm
         proxbox_vm.save()
@@ -699,13 +717,10 @@ def get_vms_for_the_node(node_task_id, task_id, iteration=0):
         vm_task.data_instance = node_vms_all
         vm_task.save()
         counter = 0
-
         for px_vm_each in node_vms_all:
             try:
                 # if counter > 0:
                 #     break
-                # if not (px_vm_each['name'] == 'E1-'):
-                #     continue
 
                 print(px_vm_each)
                 is_template = px_vm_each.get("template")

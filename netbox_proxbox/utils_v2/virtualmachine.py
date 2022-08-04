@@ -21,7 +21,7 @@ try:
     )
 
     from .cluster import get_set_cluster
-    from .extras import tag
+    from .extras import tag, custom_tag
     import re
 
 
@@ -155,7 +155,7 @@ def base_status(netbox_vm, proxmox_vm):
     return status_updated, netbox_vm
 
 
-def base_local_context_data(netbox_vm, proxmox_vm, PROXMOX, PROXMOX_PORT, domain = None):
+def base_local_context_data(netbox_vm, proxmox_vm, PROXMOX, PROXMOX_PORT, domain=None):
     current_local_context = netbox_vm.local_context_data
 
     proxmox_values = {}
@@ -167,7 +167,7 @@ def base_local_context_data(netbox_vm, proxmox_vm, PROXMOX, PROXMOX_PORT, domain
     proxmox_values["node"] = proxmox_vm["node"]
     proxmox_values["type"] = proxmox_vm["type"]
     proxmox_values["vm_url"] = 'https://{}:{}/#v1:0:={}%2F{}'.format(PROXMOX, PROXMOX_PORT, proxmox_vm["type"],
-                                                                      proxmox_vm["vmid"])
+                                                                     proxmox_vm["vmid"])
     if domain:
         proxmox_values["domain"] = '{}'.format(domain)
 
@@ -276,33 +276,60 @@ def get_ipv6(test_str):
         return None
 
 
+def handle_ip_already_set(netbox_vm, netbox_ip, family=4):
+    netbox_vm_with_ip = None
+    # Check for ipv4 or ipv6 if there is a vm with the same ip
+    if family == 4:
+        netbox_vm_with_ip = VirtualMachine.objects.filter(primary_ip4_id=netbox_ip.id).first()
+    else:
+        netbox_vm_with_ip = VirtualMachine.objects.filter(primary_ip6_id=netbox_ip.id).first()
+    # If there is not vm with the ip or is the same as the incoming vm
+    if netbox_vm_with_ip is None or netbox_vm.id == netbox_vm_with_ip.id:
+        return True, netbox_vm, netbox_ip
+    # If the netbox_vm is not the same as the netbox_vm_with_ip then we are going to set up a tag and a comment
+    # with the ip and the vm id that has the same ip
+    name = 'Repeated Ip'
+    tag_description = "No description"
+    color = 'ff3c3f'
+    repeated_tag = custom_tag(name, slugify(name), tag_description, color)
+    if repeated_tag:
+        netbox_vm.tags.add(repeated_tag)
+    netbox_vm.comments = netbox_vm.comments + '\nDuplicated ip - Name: {} - id {}'.format(netbox_vm_with_ip.name,
+                                                                                          netbox_vm_with_ip.id)
+    netbox_vm.save()
+    return False, netbox_vm, None
+
+
 def set_ipv(netbox_vm, vm_interface, ip, family=4):
     if ip is not None:
+        # Search the ip in netbox and get the content type for virtualization
         netbox_ip = IPAddress.objects.filter(address=ip).first()
         content_type = ContentType.objects.filter(app_label="virtualization", model="vminterface").first()
         if netbox_ip is None:
             # Create the ip address and link it to the interface previously created
             netbox_ip = IPAddress(address=ip)
-            netbox_ip.assigned_object_type = content_type  # "dcim.interface"
+            netbox_ip.assigned_object_type = content_type
             netbox_ip.assigned_object_id = vm_interface.id
             netbox_ip.assigned_object = vm_interface
             netbox_ip.save()
-            # Associate the ip address to the vm
-            netbox_vm.primary_ip_id = netbox_ip.id
-            netbox_vm.primary_ip4 = netbox_ip
+
+            # netbox_vm.primary_ip_id = netbox_ip.id
+            # netbox_vm.primary_ip4 = netbox_ip
             # netbox_vm.save()
-
+        r, netbox_vm, netbox_ip = handle_ip_already_set(netbox_vm, netbox_ip, family)
         if netbox_ip:
-
-            netbox_ip.assigned_object_type = content_type  # "dcim.interface"
+            # Associate the ip address to the interface
+            netbox_ip.assigned_object_type = content_type
             netbox_ip.assigned_object_id = vm_interface.id
             netbox_ip.assigned_object = vm_interface
             netbox_ip.save()
 
             if family == 4:
                 netbox_vm.primary_ip4 = netbox_ip
+                netbox_vm.primary_ip4_id = netbox_ip.id
             else:
                 netbox_vm.primary_ip6 = netbox_ip
+                netbox_vm.primary_ip6_id = netbox_ip.id
 
             netbox_vm.primary_ip_id = netbox_ip.id
 
@@ -438,10 +465,9 @@ def base_add_ip(proxmox, netbox_vm, proxmox_vm):
                 if 'description' in config:
                     ipv4, ipv6 = get_main_ip(config['description'])
             if not (ipv4 is None and ipv6 is None):
-                name = 'eth0'
-                # Create the interface if doesn't exists
                 try:
-                    vm_interface = get_set_interface(name, netbox_vm)
+                    # Create the interface if it doesn't exist
+                    vm_interface = get_set_interface('eth0', netbox_vm)
                     netbox_vm = set_ipv6(netbox_vm, vm_interface, ipv6)
                     netbox_vm = set_ipv4(netbox_vm, vm_interface, ipv4)
                 except Exception as e:
@@ -585,10 +611,11 @@ def set_assign_contact(test_str, name, object_id, content_type):
 
             contact_assigment = ContactAssignment(
                 object_id=object_id,
-                contact=contact.id,
+                contact=contact,
                 content_type_id=content_type.id,
                 contact_id=contact.id,
-                role=contact_role.id,
+                role=contact_role,
+                role_id=contact_role.id,
                 priority="primary"
             )
             contact_assigment.save()
@@ -637,8 +664,7 @@ def set_tenant(netbox_vm, observation):
 
     netbox_vm.tenant_id = tenant.id
     netbox_vm.tenant = tenant
-    if observation:
-        netbox_vm.comments = observation
+
     netbox_vm.save()
 
     return netbox_vm
@@ -716,6 +742,8 @@ def base_add_configuration(proxmox, netbox_vm, proxmox_vm):
 
     try:
         if 'description' in config:
+            if config['description']:
+                netbox_vm.comments = config['description']
             netbox_vm = set_tenant(netbox_vm, config['description'])
             netbox_vm = set_contact_to_vm(config['description'], netbox_vm)
         else:
