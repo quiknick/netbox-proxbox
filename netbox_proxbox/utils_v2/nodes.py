@@ -184,7 +184,7 @@ def get_set_interface(name, netbox_node):
 def interface_ip_assign(netbox_node, proxmox_json):
     ip = proxmox_json.get("ip", None)
     try:
-        node_interface = get_set_interface('Bond0', netbox_node)
+        node_interface = get_set_interface('bond0', netbox_node)
         # netbox_ip = nb.ipam.ip_addresses.get(address=ip)
         netbox_ip = IPAddress.objects.filter(address=ip).first()
         content_type = ContentType.objects.filter(app_label="dcim", model="interface").first()
@@ -199,7 +199,6 @@ def interface_ip_assign(netbox_node, proxmox_json):
             netbox_ip.save()
         else:
             try:
-
                 netbox_ip.assigned_object_type = content_type  # "dcim.interface"
                 netbox_ip.assigned_object_id = node_interface.id
                 netbox_ip.assigned_object = node_interface
@@ -301,14 +300,24 @@ def get_set_nodes(**kwargs):
         proxmox_session = kwargs.get('proxmox_session', None)
 
         node_ip = proxmox_json.get("ip", None)
-
-        proxmox_node_name = proxmox_json.get("name")
+        try:
+            node = proxmox.nodes(proxmox_json['name']).network().get()
+            node_ip_mask = node_ip
+            for d in node:
+                if 'address' in d and d['address'] == node_ip:
+                    node_ip_mask = d['cidr']
+                    break
+            proxmox_node_name = proxmox_json.get("name")
+            proxmox_json['ip'] = node_ip_mask
+        except Exception as e:
+            print("Error getting the ip with mask")
+            print(e)
 
         json_node = {}
 
         # Search netbox using VM name
         if node_ip:
-            netbox_search = find_node_by_ip(node_ip)
+            netbox_search = find_node_by_ip(node_ip_mask)
         if netbox_search is None:
             # netbox_search = nb.dcim.devices.filter(name=proxmox_node_name).first()
             netbox_search = Device.objects.filter(name=proxmox_node_name).first()
