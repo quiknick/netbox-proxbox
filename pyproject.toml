@@ -24,8 +24,8 @@ yamllint = "^1.26.1"
 [build-system]
 requires = [
     "poetry-core>=1.0.0",
-    "requests",
-    "pynetbox",
-    "proxmoxer"
+    "requests>=2",
+    "pynetbox>=6",
+    "proxmoxer>=1"
 ]
 build-backend = "poetry.core.masonry.api"
