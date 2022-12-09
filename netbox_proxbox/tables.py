@@ -1,8 +1,8 @@
 # tables.py
 import django_tables2 as tables
-
 from netbox.tables import NetBoxTable, ChoiceFieldColumn
 from .models import ProxmoxVM
+
 
 class ProxmoxVMTable(NetBoxTable):
     """Table for displaying BGP Peering objects."""

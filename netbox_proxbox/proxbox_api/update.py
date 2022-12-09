@@ -33,17 +33,23 @@ def vm_full_update(netbox_vm, proxmox_vm):
     local_context_updated = updates.virtual_machine.local_context_data(netbox_vm, proxmox_vm)
 
     # Update 'resources', like CPU, Memory and Disk, if necessary.
+    print("[OK] Update 'resources', like CPU, Memory and Disk, if necessary.")
     resources_updated = updates.virtual_machine.resources(netbox_vm, proxmox_vm)
 
+    print("[OK] Update tags")
     tag_updated = updates.extras.tag(netbox_vm)
 
+    #
+    print("[OK] Update ips")
+    ip_update = updates.virtual_machine.add_configuration(proxmox, netbox_vm, proxmox_vm)
     #changes = [custom_fields_updated, status_updated, local_context_updated, resources_updated]
     changes = {
         "status" : status_updated,
         "custom_fields" : custom_fields_updated,
         "local_context" : local_context_updated,
         "resources" : resources_updated,
-        "tag" : tag_updated
+        "tag": tag_updated,
+        "ip": ip_update
     }
 
     return changes
@@ -54,15 +60,27 @@ def node_full_update(netbox_node, proxmox_json, proxmox_cluster):
     changes = {}
 
     status_updated = updates.node.status(netbox_node, proxmox_json)
-    cluster_updated = updates.node.cluster(netbox_node, proxmox_json, proxmox_cluster)
+        cluster_updated = updates.node.cluster(proxmox, netbox_node, proxmox_json, proxmox_cluster)
+        ip_updated = updates.node.interface_ip_assign(netbox_node, proxmox_json)
+        if proxmox_session:
+            role_updated = updates.node.update_role(netbox_node, proxmox_session)
+
+        device_type_updated = updates.node.update_device_type(netbox_node)
 
     changes = {
         "status" : status_updated,
-        "cluster" : cluster_updated
+            "cluster": cluster_updated,
+            "ip": ip_updated,
+            "role": False if role_updated is None else role_updated,
+            "device_type_updated": device_type_updated
     }
 
     return changes
 
+    except Exception as e:
+        print("Error: node_full_update - {}".format(e))
+        print(e)
+        raise e
 
 
 # Verify if VM/CT exist on Netbox
@@ -111,7 +129,7 @@ def search_by_proxmox_name(proxmox_name):
 
 
 def search_by_id(id):
-    # Save Netbox VirtualMachine object
+    # Get Netbox VirtualMachine object
     netbox_obj = nb.virtualization.virtual_machines.get(id)
 
     proxmox_name = netbox_obj.name
@@ -329,16 +347,32 @@ def virtual_machine(**kwargs):
     return json_vm
 
 
+def find_node_by_ip(ip):
+    current_ips = nb.ipam.ip_addresses.filter(address=ip)
+    if len(current_ips) > 0:
+        for current_ip in current_ips:
+            if current_ip and current_ip.assigned_object and current_ip.assigned_object.device:
+                device = current_ip.assigned_object.device
+                return device
 
 def nodes(**kwargs):
+    try:
     proxmox_cluster = kwargs.get('proxmox_cluster')
     proxmox_json = kwargs.get('proxmox_json')
+        proxmox = kwargs.get('proxmox')
+        proxmox_session = kwargs.get('proxmox_session', None)
+
+        node_ip = proxmox_json.get("ip", None)
 
     proxmox_node_name = proxmox_json.get("name")
 
     json_node = {}
 
     # Search netbox using VM name
+        if node_ip:
+            netbox_search = find_node_by_ip(node_ip)
+        if netbox_search is None:
+            # netbox_search = nb.dcim.devices.filter(name=proxmox_node_name).first()
     netbox_search = nb.dcim.devices.get(name = proxmox_node_name)
 
     # Search node on Netbox with Proxmox node name gotten
@@ -442,6 +476,7 @@ def all(**kwargs):
     if remove_unused == True:
         print('\nREMOVE UNUSED DATA...')
         remove_info = remove.all()
+    
     else:
         remove_info = False
     #
@@ -455,6 +490,7 @@ def all(**kwargs):
     return result
 
 
+
 # Runs if script executed directly
 if __name__ == "__main__":
     print('#\n# COMPARE PROXMOX WITH NETBOX\n#')
@@ -462,4 +498,4 @@ if __name__ == "__main__":
 
     print('____________________________________\n')
     print('#\n# COMPARE PROXMOX WITH NETBOX\n#')
-    remove.all()
+    remove.all()    

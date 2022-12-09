@@ -52,6 +52,7 @@ DEFAULT_NETBOX_TOKEN = DEFAULT_NETBOX_SETTING.get("token")
 # SETTINGS
 DEFAULT_NETBOX_SETTINGS = DEFAULT_NETBOX_SETTING.get("settings")
 DEFAULT_NETBOX_VM_ROLE_ID = DEFAULT_NETBOX_SETTINGS.get("virtualmachine_role_id", 0)
+DEFAULT_NETBOX_VM_ROLE_NAME = DEFAULT_NETBOX_SETTINGS.get("virtualmachine_role_name", "Proxbox Basic Role")
 DEFAULT_NETBOX_NODE_ROLE_ID = DEFAULT_NETBOX_SETTINGS.get("node_role_id", 0)
 DEFAULT_NETBOX_SITE_ID = DEFAULT_NETBOX_SETTINGS.get("site_id", 0)
 
@@ -98,12 +99,60 @@ NETBOX_TOKEN = NETBOX_SETTING.get("token", DEFAULT_NETBOX_TOKEN)
 # SETTINGS
 NETBOX_SETTINGS = NETBOX_SETTING.get("settings", DEFAULT_NETBOX_SETTINGS)
 
+NETBOX_TENANT_NAME = "proxbox_tenant"
+NETBOX_TENANT_REGEX_VALIDATOR = "proxbox"
+NETBOX_TENANT_DESCRIPTION = "Proxbox custom tenant and tag"
+NETBOX_MANUFACTURER = "Proxbox Basic Manufacturer"
 if NETBOX_SETTINGS != None:
     NETBOX_VM_ROLE_ID = NETBOX_SETTINGS.get("virtualmachine_role_id", DEFAULT_NETBOX_VM_ROLE_ID)
+    NETBOX_VM_ROLE_NAME = NETBOX_SETTINGS.get("virtualmachine_role_name", DEFAULT_NETBOX_VM_ROLE_NAME)
     NETBOX_NODE_ROLE_ID = NETBOX_SETTINGS.get("node_role_id", DEFAULT_NETBOX_NODE_ROLE_ID)
     NETBOX_SITE_ID = NETBOX_SETTINGS.get("site_id", DEFAULT_NETBOX_SITE_ID)
+    NETBOX_TENANT_NAME = NETBOX_SETTINGS.get("tenant_name", NETBOX_TENANT_NAME)
+    NETBOX_TENANT_REGEX_VALIDATOR = NETBOX_SETTINGS.get("tenant_regex_validator", NETBOX_TENANT_REGEX_VALIDATOR)
+    NETBOX_TENANT_DESCRIPTION = NETBOX_SETTINGS.get("tenant_description", NETBOX_TENANT_DESCRIPTION)
+    NETBOX_MANUFACTURER = NETBOX_SETTINGS.get("manufacturer", NETBOX_TENANT_DESCRIPTION)
+PROXMOX_SESSIONS = {}
 
 
+def get_proxmox_session(PROXMOX_SETTING):
+    #
+    # Proxmox related settings
+    #
+    # API URI
+
+    PROXMOX = PROXMOX_SETTING.get("domain", DEFAULT_PROXMOX)
+    PROXMOX_PORT = PROXMOX_SETTING.get("http_port", DEFAULT_PROXMOX_PORT)
+    PROXMOX_SSL = PROXMOX_SETTING.get("ssl", DEFAULT_PROXMOX_SSL)
+
+    # ACCESS
+    PROXMOX_USER = PROXMOX_SETTING.get("user", DEFAULT_PROXMOX_USER)
+    # PROXMOX_PASSWORD = PROXMOX_SETTING.get("password", DEFAULT_PROXMOX_PASSWORD)
+
+    PROXMOX_TOKEN = PROXMOX_SETTING.get("token", DEFAULT_PROXMOX_TOKEN)
+    if PROXMOX_TOKEN != None:
+        PROXMOX_TOKEN_NAME = PROXMOX_TOKEN.get("name", DEFAULT_PROXMOX_TOKEN_NAME)
+        PROXMOX_TOKEN_VALUE = PROXMOX_TOKEN.get("value", DEFAULT_PROXMOX_TOKEN_VALUE)
+
+    NETBOX_VM_ROLE_ID = PROXMOX_SETTING.get("virtualmachine_role_id", DEFAULT_NETBOX_VM_ROLE_ID)
+    NETBOX_NODE_ROLE_ID = PROXMOX_SETTING.get("node_role_id", DEFAULT_NETBOX_NODE_ROLE_ID)
+    NETBOX_SITE_ID = PROXMOX_SETTING.get("site_id", DEFAULT_NETBOX_SITE_ID)
+    NETBOX_SITE_NAME = PROXMOX_SETTING.get("site_name", None)
+    NETBOX_NODE_ROLE_NAME = PROXMOX_SETTING.get("node_role_name", None)
+
+    output = {
+        'PROXMOX': PROXMOX,
+        'PROXMOX_PORT': PROXMOX_PORT,
+        'PROXMOX_SSL': PROXMOX_SSL,
+        'PROXMOX_TOKEN': PROXMOX_TOKEN,
+        'PROXMOX_TOKEN_NAME': PROXMOX_TOKEN_NAME,
+        'PROXMOX_TOKEN_VALUE': PROXMOX_TOKEN_VALUE,
+        'NETBOX_VM_ROLE_ID': NETBOX_VM_ROLE_ID,
+        'NETBOX_NODE_ROLE_ID': NETBOX_NODE_ROLE_ID,
+        'NETBOX_SITE_ID': NETBOX_SITE_ID,
+        'NETBOX_SITE_NAME': NETBOX_SITE_NAME,
+        'NETBOX_NODE_ROLE_NAME': NETBOX_NODE_ROLE_NAME
+    }
 ####################################################################################################
 #                                                                                                  #
 #                 WITH PLUGIN CONFIGURED, STARTS BOTH PROXMOX AND NETBOX SESSION                   #
@@ -144,20 +193,17 @@ else:
 # NETBOX SESSION 
 #
 # TODO: CREATES SSL VERIFICATION - Issue #32
-try:
+    try:
     # CHANGE SSL VERIFICATION TO FALSE
     session = requests.Session()
     session.verify = False
-
-    NETBOX = 'http://{}:{}'.format(NETBOX, NETBOX_PORT)
-
+        NETBOX = 'http://{}:{}'.format(NETBOX, NETBOX_PORT)
     # Start NETBOX session
-    NETBOX_SESSION = pynetbox.api(
-        NETBOX,
-        token=NETBOX_TOKEN
-    )
+        NETBOX_SESSION = pynetbox.api(
+            NETBOX,
+            token=NETBOX_TOKEN
+        )
     # DISABLES SSL VERIFICATION
     NETBOX_SESSION.http_session = session
-
-except:
+    except:
     raise RuntimeError(f"Error trying to initialize Netbox Session using TOKEN {NETBOX_TOKEN} provided.")
